@@ -11,13 +11,20 @@ import { useTranslations } from "next-intl"
 import type { ReactNode } from "react"
 
 type SettingIntegrationLayoutProps = {
-  workspaceToken: ReactNode
-  openAI: ReactNode
-  gemini: ReactNode
-  claude: ReactNode
-  deepSeek: ReactNode
-  googleSheets: ReactNode
-  mailchimp: ReactNode
+  workspaceToken?: ReactNode
+  openAI?: ReactNode
+  gemini?: ReactNode
+  claude?: ReactNode
+  deepSeek?: ReactNode
+  googleSheets?: ReactNode
+  activeCampaign?: ReactNode
+  getResponse?: ReactNode
+  mailchimp?: ReactNode
+  mailerLite?: ReactNode
+  moosend?: ReactNode
+  drip?: ReactNode
+  sendGrid?: ReactNode
+  klaviyo?: ReactNode
 }
 
 export default function SettingIntegrationLayout({
@@ -27,7 +34,14 @@ export default function SettingIntegrationLayout({
   claude,
   deepSeek,
   googleSheets,
+  activeCampaign,
+  getResponse,
   mailchimp,
+  mailerLite,
+  moosend,
+  drip,
+  sendGrid,
+  klaviyo,
 }: SettingIntegrationLayoutProps) {
   const t = useTranslations()
 
@@ -63,9 +77,44 @@ export default function SettingIntegrationLayout({
       content: googleSheets,
     },
     {
+      keyName: t("activeCampaign.title"),
+      icon: MailIcon,
+      content: activeCampaign,
+    },
+    {
+      keyName: t("getResponse.title"),
+      icon: MailIcon,
+      content: getResponse,
+    },
+    {
       keyName: t("mailchimp.title"),
       icon: MailIcon,
       content: mailchimp,
+    },
+    {
+      keyName: t("mailerLite.title"),
+      icon: MailIcon,
+      content: mailerLite,
+    },
+    {
+      keyName: t("moosend.title"),
+      icon: MailIcon,
+      content: moosend,
+    },
+    {
+      keyName: t("drip.title"),
+      icon: MailIcon,
+      content: drip,
+    },
+    {
+      keyName: t("sendGrid.title"),
+      icon: MailIcon,
+      content: sendGrid,
+    },
+    {
+      keyName: t("klaviyo.title"),
+      icon: MailIcon,
+      content: klaviyo,
     },
   ]
 

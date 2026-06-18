@@ -139,7 +139,8 @@
   },
   "aiFiles": {
     "description": "Give Your Agents Access to PDFs, Docs, and More",
-    "title": "Knowledge"
+    "title": "Knowledge",
+    "noEmbeddingProvider": "No embedding provider configured. AI file embeddings require OpenAI or Gemini integration. DeepSeek and Claude do not support embedding models."
   },
   "aiFunctions": {
     "description": "Configure LLM functions to make your AI agent more intelligent",
@@ -716,8 +717,23 @@
     "googleSheets": {
       "label": "Google Sheets"
     },
+    "activeCampaign": {
+      "label": "ActiveCampaign"
+    },
+    "getResponse": {
+      "label": "GetResponse"
+    },
     "mailchimp": {
       "label": "Mailchimp"
+    },
+    "mailerLite": {
+      "label": "MailerLite"
+    },
+    "klaviyo": {
+      "label": "Klaviyo"
+    },
+    "moosend": {
+      "label": "Moosend"
     },
     "host": {
       "label": "Host",
@@ -1386,10 +1402,16 @@
       "placeholder": "Enter code"
     },
     "authCallbackUrl": {
-      "label": "Auth Callback URL"
+      "label": "Auth Callback URL",
+      "hint": "Register this exact URL as the OAuth redirect URI in your provider app. It must use this host, not your custom domain — the provider cannot reach a custom domain."
+    },
+    "signInCallbackUrl": {
+      "label": "Sign-in Callback URL",
+      "hint": "Add this to your Google app's authorized redirect URIs to enable Google sign-in."
     },
     "webhookUrl": {
-      "label": "Webhook URL"
+      "label": "Webhook URL",
+      "hint": "Register this exact Webhook URL in your provider app. It must use this host, not your custom domain — the provider cannot reach a custom domain."
     },
     "tiktok": {
       "label": "TikTok",
@@ -1403,6 +1425,12 @@
         "step2": "Authorize your account and copy the <strong>access token</strong>, <strong>open ID</strong>, and <strong>client secret</strong>.",
         "step3": "Paste the credentials below to connect."
       }
+    },
+    "drip": {
+      "label": "Drip"
+    },
+    "sendGrid": {
+      "label": "SendGrid"
     },
     "currentVersion": "Current"
   },
@@ -1451,7 +1479,14 @@
       "getDataFromJson": "Get Data From JSON",
       "inboxActions": "Inbox Actions",
       "markEmailVerified": "Mark Email Verified",
+      "activeCampaignSyncContact": "Add Contact to ActiveCampaign",
       "mailchimpAddMember": "Add Contact to MailChimp",
+      "mailerLiteAddSubscriber": "Add Contact to MailerLite",
+      "klaviyoSyncProfile": "Add Contact to Klaviyo",
+      "moosendCreateContact": "Add Contact to Moosend",
+      "dripSubscribeSubscriber": "Add Contact to Drip",
+      "getResponseAddContact": "Add Contact to GetResponse",
+      "sendGridAddContact": "Add Contact to SendGrid",
       "openWebsite": "Open Website",
       "optInEmail": "Opt In Email",
       "optOutEmail": "Opt Out Email",
@@ -1610,6 +1645,98 @@
     "header": "Column Header",
     "title": "Google Sheets"
   },
+  "activeCampaign": {
+    "title": "ActiveCampaign",
+    "setting": {
+      "label": "ActiveCampaign",
+      "description": "This integration lets you save customers contacts from your bot to ActiveCampaign."
+    },
+    "dialog": {
+      "description": "Enter the API URL and API Key from your ActiveCampaign account settings."
+    },
+    "fields": {
+      "apiUrl": "API URL",
+      "apiUrlPlaceholder": "https://youraccount.api-us1.com",
+      "apiKey": "API Key",
+      "operation": "Operation",
+      "emailField": "Email Field",
+      "emailTooltip": "Contact field containing the email used to identify the ActiveCampaign contact.",
+      "phoneField": "Phone field",
+      "phone": "Phone",
+      "list": "List",
+      "lists": "Lists",
+      "tags": "Tags",
+      "automation": "Automation",
+      "customFields": "Custom Fields in ActiveCampaign",
+      "optional": "Optional",
+      "nothingSelected": "Nothing selected",
+      "emptyField": "---",
+      "addCustomField": "Add custom field"
+    },
+    "operations": {
+      "createOrUpdateContact": "Create or Update Contact",
+      "addContactToAutomation": "Add Contact to Automation"
+    },
+    "lists": {
+      "loading": "Loading ActiveCampaign lists...",
+      "error": "Failed to load ActiveCampaign lists. Check that the integration is connected.",
+      "empty": "No ActiveCampaign lists found."
+    },
+    "automations": {
+      "loading": "Loading ActiveCampaign automations...",
+      "error": "Failed to load ActiveCampaign automations. Check that the integration is connected.",
+      "empty": "No ActiveCampaign automations found."
+    },
+    "tags": {
+      "loading": "Loading ActiveCampaign tags...",
+      "error": "Failed to load ActiveCampaign tags. Check that the integration is connected.",
+      "empty": "No ActiveCampaign tags found."
+    },
+    "customFields": {
+      "loading": "Loading ActiveCampaign custom fields...",
+      "error": "Failed to load ActiveCampaign custom fields. Check that the integration is connected.",
+      "empty": "No ActiveCampaign custom fields found."
+    },
+    "errors": {
+      "invalidCredentials": "Invalid ActiveCampaign API URL or API Key. Please check your credentials and try again."
+    }
+  },
+  "getResponse": {
+    "title": "GetResponse",
+    "setting": {
+      "label": "GetResponse",
+      "description": "This integration lets you save customers contacts from your bot to GetResponse."
+    },
+    "fields": {
+      "apiKey": "API Key",
+      "list": "List",
+      "listPlaceholder": "Select a list",
+      "email": "Email Field",
+      "emailPlaceholder": "Select an email field",
+      "emailTooltip": "Contact field that contains the email to identify contacts in GetResponse.",
+      "tags": "Tags",
+      "tagsPlaceholder": "Select tags",
+      "dayOfCycle": "Day of Autoresponder Cycle",
+      "dayOfCyclePlaceholder": "0",
+      "dayOfCycleTooltip": "Move a contact to a specific day in your autoresponder cycle. Enter 0 to start at day 0.",
+      "optional": "Optional"
+    },
+    "campaigns": {
+      "loading": "Loading GetResponse lists...",
+      "error": "Failed to load GetResponse lists. Check that the integration is connected.",
+      "empty": "No GetResponse lists found.",
+      "limited": "Only the first page of GetResponse lists is shown."
+    },
+    "tags": {
+      "loading": "Loading GetResponse tags...",
+      "error": "Failed to load GetResponse tags. Check that the integration is connected.",
+      "empty": "No GetResponse tags found.",
+      "limited": "Only the first page of GetResponse tags is shown."
+    },
+    "errors": {
+      "invalidApiKey": "Invalid API Key. Please check your GetResponse API Key and try again."
+    }
+  },
   "mailchimp": {
     "title": "Mailchimp",
     "setting": {
@@ -1627,6 +1754,148 @@
       "optional": "Optional",
       "tags": "Tags",
       "mergeFields": "Custom Fields in MailChimp"
+    }
+  },
+  "mailerLite": {
+    "title": "MailerLite",
+    "setting": {
+      "label": "MailerLite",
+      "description": "This integration lets you save customers contacts from your bot to MailerLite."
+    },
+    "fields": {
+      "apiToken": "API Token",
+      "group": "Group",
+      "groupPlaceholder": "Nothing selected",
+      "email": "Email Field",
+      "status": "Type",
+      "customFields": "Custom Fields in MailerLite (Optional)",
+      "emptyField": "---",
+      "providerField": "Select MailerLite field",
+      "addMapping": "Add New"
+    },
+    "status": {
+      "active": "Subscribed",
+      "unconfirmed": "Unconfirmed"
+    },
+    "errors": {
+      "invalidApiKey": "Invalid API Token. Please check your MailerLite API Token and try again."
+    }
+  },
+  "klaviyo": {
+    "title": "Klaviyo",
+    "setting": {
+      "label": "Klaviyo",
+      "description": "This integration lets you sync customer profiles from your bot to Klaviyo."
+    },
+    "fields": {
+      "apiKey": "API Key",
+      "list": "Klaviyo List",
+      "listPlaceholder": "Select a Klaviyo list",
+      "email": "Email Field",
+      "titleField": "Title Field",
+      "titlePlaceholder": "Select a field",
+      "orgField": "Organization Field",
+      "orgPlaceholder": "Select a field",
+      "customProperties": "Custom Fields in Klaviyo",
+      "emptyField": "Select a contact field",
+      "propertyKey": "Klaviyo property key",
+      "addMapping": "Add mapping"
+    },
+    "lists": {
+      "error": "Unable to load Klaviyo lists. Check that the integration is connected."
+    },
+    "errors": {
+      "invalidApiKey": "Invalid API Key. Please check your Klaviyo API Key and try again."
+    }
+  },
+  "moosend": {
+    "title": "Moosend",
+    "setting": {
+      "label": "Moosend",
+      "description": "This integration lets you save customers contacts from your bot to Moosend."
+    },
+    "fields": {
+      "apiKey": "API Key",
+      "list": "Moosend list",
+      "listPlaceholder": "Select a Moosend list",
+      "email": "Email Field"
+    },
+    "lists": {
+      "loading": "Loading Moosend mailing lists...",
+      "empty": "No Moosend mailing lists found.",
+      "error": "Unable to load Moosend mailing lists. Check that the integration is connected."
+    },
+    "errors": {
+      "invalidApiKey": "Invalid API Key. Please check your Moosend API Key and try again.",
+      "userNotEnabled": "This Moosend account is not enabled for API access.",
+      "connectFailed": "Failed to connect Moosend. Please try again later."
+    }
+  },
+  "drip": {
+    "title": "Drip",
+    "setting": {
+      "label": "Drip",
+      "description": "This integration lets you save customers contacts from your bot to Drip."
+    },
+    "fields": {
+      "apiToken": "API Token",
+      "account": "Account",
+      "emailField": "Email Field",
+      "emailTooltip": "Contact field containing the email used to identify the Drip subscriber.",
+      "phone": "Phone",
+      "tags": "Tags",
+      "customFields": "Custom Fields in Drip",
+      "optional": "Optional",
+      "nothingSelected": "Nothing selected",
+      "addCustomField": "Add Custom Field"
+    },
+    "accounts": {
+      "loading": "Loading Drip accounts...",
+      "error": "Failed to load Drip accounts. Check that the integration is connected."
+    },
+    "tags": {
+      "loading": "Loading Drip tags...",
+      "error": "Failed to load Drip tags. Check that the integration is connected.",
+      "empty": "No Drip tags found."
+    },
+    "customFields": {
+      "loading": "Loading Drip custom fields...",
+      "error": "Failed to load Drip custom fields. Check that the integration is connected.",
+      "empty": "No Drip custom fields found."
+    },
+    "errors": {
+      "noAccount": "This API Token does not have access to a Drip account."
+    }
+  },
+  "sendGrid": {
+    "title": "SendGrid",
+    "setting": {
+      "label": "SendGrid",
+      "description": "This integration lets you save customer contacts from your bot to SendGrid."
+    },
+    "scopeHelp": "Create a SendGrid API key with Marketing read and write access.",
+    "acceptedLimitation": "SendGrid accepts contact updates for asynchronous processing. Accepted updates may still fail later.",
+    "fields": {
+      "apiKey": "API Key",
+      "list": "List",
+      "emailField": "Email field",
+      "phoneField": "Phone field",
+      "customFields": "Custom Fields in SendGrid",
+      "optional": "Optional",
+      "nothingSelected": "Nothing selected",
+      "addCustomField": "Add custom field"
+    },
+    "lists": {
+      "loading": "Loading SendGrid lists...",
+      "error": "Failed to load SendGrid lists. Check that the integration is connected."
+    },
+    "customFields": {
+      "loading": "Loading SendGrid custom fields...",
+      "error": "Failed to load SendGrid custom fields. Check that the integration is connected."
+    },
+    "errors": {
+      "invalidApiKey": "Invalid API Key. Please check your SendGrid API Key and try again.",
+      "missingScopes": "This API key must have Marketing read access. Please ensure your SendGrid API key includes Marketing permissions."
     }
   },
   "integrations": {
@@ -1891,6 +2160,7 @@
   },
   "auth": {
     "orContinueWith": "Or continue with",
+    "continueWithFacebook": "Continue with Facebook",
     "dontHaveAnAccount": "Don't have an account?",
     "alreadyHaveAnAccount": "Already have an account?",
     "signUp": "Sign up",
@@ -1957,6 +2227,8 @@
       "label": "Commands"
     },
     "connectExisting": "Connect an existing WhatsApp Business Account",
+    "embeddedSignupDone": "Signup complete — you can close this tab.",
+    "embeddedSignupPopupBlocked": "Please allow pop-ups for this site, then try again.",
     "fillRequiredFields": "Please fill in all required fields",
     "continueManualConnect": "Continue — manual connect",
     "icebreakers": {
@@ -2449,7 +2721,11 @@
     }
   },
   "platformCredentials": {
-    "title": "Platform Credentials"
+    "title": "Platform Credentials",
+    "usingPlatformDefault": "Using platform default",
+    "usingPlatformDefaultHint": "This channel works out of the box with the platform's shared app. Add your own settings anytime to override it.",
+    "notConfigured": "Not set up yet",
+    "notConfiguredHint": "Add your settings to start using this integration."
   },
   "platformBranding": {
     "title": "Platform Branding",
@@ -2512,11 +2788,13 @@
   "manageSidebar": {
     "platformGroup": "Platform",
     "saasGroup": "SaaS",
-    "portalUsers": "Users",
+    "portalUsers": "Sub-accounts",
+    "portalWorkspaces": "Workspaces",
     "portalPlans": "Plans",
     "portalUsage": "Usage",
     "portalCustomDomain": "Custom Domain",
-    "portalPaymentProcessor": "Payment Processor"
+    "portalPaymentProcessor": "Payment Processor",
+    "portalPricingPage": "Pricing"
   },
   "unsubscribePage": {
     "title": "You have been unsubscribed.",

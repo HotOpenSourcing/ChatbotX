@@ -36,11 +36,23 @@ export type IntegrationDeepseekModel =
   typeof schema.integrationDeepseekModel.$inferSelect
 export type IntegrationGeminiModel =
   typeof schema.integrationGeminiModel.$inferSelect
+export type IntegrationGetResponseModel =
+  typeof schema.integrationGetResponseModel.$inferSelect
 export type IntegrationModel = typeof schema.integrationModel.$inferSelect
+export type IntegrationActiveCampaignModel =
+  typeof schema.integrationActiveCampaignModel.$inferSelect
 export type IntegrationGoogleSheetsModel =
   typeof schema.integrationGoogleSheetsModel.$inferSelect
 export type IntegrationMailchimpModel =
   typeof schema.integrationMailchimpModel.$inferSelect
+export type IntegrationMailerLiteModel =
+  typeof schema.integrationMailerLiteModel.$inferSelect
+export type IntegrationMoosendModel =
+  typeof schema.integrationMoosendModel.$inferSelect
+export type IntegrationDripModel =
+  typeof schema.integrationDripModel.$inferSelect
+export type IntegrationSendGridModel =
+  typeof schema.integrationSendGridModel.$inferSelect
 export type IntegrationMessengerModel =
   typeof schema.integrationMessengerModel.$inferSelect
 export type IntegrationOpenAIModel =
@@ -66,8 +78,7 @@ export type ContactCustomFieldModel =
   typeof schema.contactCustomFieldModel.$inferSelect
 export type WorkspaceModel = typeof schema.workspaceModel.$inferSelect
 export type CustomDomainModel = typeof schema.customDomainModel.$inferSelect
-export type PlatformSettingModel =
-  typeof schema.platformSettingModel.$inferSelect
+export type TenantModel = typeof schema.tenantModel.$inferSelect
 export type PlatformCredentialModel =
   typeof schema.platformCredentialModel.$inferSelect
 export type ContactNoteModel = typeof schema.contactNoteModel.$inferSelect

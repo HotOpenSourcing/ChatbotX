@@ -1,5 +1,6 @@
 import { type StepType, stepTypes } from "@chatbotx.io/flow-config"
 import { memo } from "react"
+import { activeCampaignSyncContactStep } from "./active-campaign-sync-contact"
 import { addContactNotesStep } from "./add-contact-notes"
 import { addContactTagStep } from "./add-contact-tag"
 import { addNotesStep } from "./add-notes"
@@ -22,15 +23,20 @@ import { countCharactersStep } from "./count-characters"
 import type { StepDefinition } from "./definition"
 import { deleteContactStep } from "./delete-contact"
 import { disableBotStep } from "./disable-bot"
+import { dripSubscribeSubscriberStep } from "./drip-subscribe-subscriber"
 import emailStep from "./email"
 import { enableBotStep } from "./enable-bot"
 import { followConversationStep } from "./follow-conversation"
 import { formatDateStep } from "./format-date"
 import { generateCodeStep } from "./generate-code"
 import { getDataFromJsonStep } from "./get-data-from-json"
+import { getResponseAddContactStep } from "./get-response-add-contact"
 import { getUserDataStep } from "./get-user-data"
+import { klaviyoSyncProfileStep } from "./klaviyo-sync-profile"
 import { mailchimpAddMemberStep } from "./mailchimp-add-member"
+import { mailerLiteAddSubscriberStep } from "./mailer-lite-add-subscriber"
 import { markEmailVerifiedStep } from "./mark-email-verified"
+import { moosendCreateContactStep } from "./moosend-create-contact"
 import { openWebsiteStep } from "./open-website"
 import { optInEmailStep } from "./opt-in-email"
 import { optOutEmailStep } from "./opt-out-email"
@@ -44,6 +50,7 @@ import sendMessengerTemplateMessageStep from "./send-messenger-template-message"
 import sendTextStep from "./send-text"
 import { sendVideoStep } from "./send-video"
 import sendWaTemplateMessageStep from "./send-wa-template-message"
+import { sendGridAddContactStep } from "./sendgrid-add-contact"
 import { setCustomFieldStep } from "./set-custom-field"
 import { splitTrafficStep } from "./split-traffic"
 import { spreadsheetClearRowStep } from "./spreadsheet-clear-row"
@@ -99,7 +106,14 @@ export const allSteps: Record<StepType, StepDefinition<any> | undefined> = {
   [stepTypes.enum.unarchiveConversation]: unarchiveConversationStep,
   [stepTypes.enum.blockContact]: blockContactStep,
   [stepTypes.enum.markEmailVerified]: markEmailVerifiedStep,
+  [stepTypes.enum.activeCampaignSyncContact]: activeCampaignSyncContactStep,
+  [stepTypes.enum.getResponseAddContact]: getResponseAddContactStep,
+  [stepTypes.enum.dripSubscribeSubscriber]: dripSubscribeSubscriberStep,
   [stepTypes.enum.mailchimpAddMember]: mailchimpAddMemberStep,
+  [stepTypes.enum.mailerLiteAddSubscriber]: mailerLiteAddSubscriberStep,
+  [stepTypes.enum.moosendCreateContact]: moosendCreateContactStep,
+  [stepTypes.enum.sendGridAddContact]: sendGridAddContactStep,
+  [stepTypes.enum.klaviyoSyncProfile]: klaviyoSyncProfileStep,
   [stepTypes.enum.optInEmail]: optInEmailStep,
   [stepTypes.enum.optOutEmail]: optOutEmailStep,
   [stepTypes.enum.cancelContactInput]: undefined,

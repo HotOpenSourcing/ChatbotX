@@ -1,5 +1,6 @@
 "use client"
 
+import type { SocialProvider } from "@chatbotx.io/auth/server"
 import {
   Card,
   CardContent,
@@ -9,7 +10,7 @@ import Link from "next/link"
 import { useTranslations } from "next-intl"
 import { isCommunity } from "@/env"
 import SSOSignUp from "@/features/auth/sso-sign-in"
-import { usePlatformSettings } from "../platform"
+import { useTenantSettings } from "../tenant"
 import { EmailPasswordSignUp } from "./components/email-password-sign-up"
 import {
   AcceptTermsAndPolicy,
@@ -19,11 +20,17 @@ import {
 
 export type SignUpFormProps = {
   callbackUrl?: string
+  /** Social providers configured for this tenant (own app or platform default). */
+  enabledProviders?: SocialProvider[]
 }
 
-export const SignUpForm = ({ callbackUrl, ...props }: SignUpFormProps) => {
+export const SignUpForm = ({
+  callbackUrl,
+  enabledProviders = [],
+  ...props
+}: SignUpFormProps) => {
   const t = useTranslations()
-  const { name } = usePlatformSettings()
+  const { name } = useTenantSettings()
 
   return (
     <div className="flex flex-col gap-6" {...props}>
@@ -36,10 +43,10 @@ export const SignUpForm = ({ callbackUrl, ...props }: SignUpFormProps) => {
           <div className="grid gap-6">
             <EmailPasswordSignUp />
 
-            {!isCommunity() && (
+            {!isCommunity() && enabledProviders.length > 0 && (
               <>
                 <OrSeparator />
-                <SSOSignUp />
+                <SSOSignUp providers={enabledProviders} />
               </>
             )}
 

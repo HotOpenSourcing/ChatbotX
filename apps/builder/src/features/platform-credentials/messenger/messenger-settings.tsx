@@ -27,35 +27,30 @@ import { useHookFormAction } from "@next-safe-action/adapter-react-hook-form/hoo
 import { CopyIcon, Loader2Icon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { toast } from "sonner"
 import { useClipboard } from "@/hooks/use-clipboard"
+import { buildBrokerCallbackUrl } from "@/lib/oauth-broker"
+import { CredentialFallbackNote } from "../credential-fallback-note"
 import { useCredentialScope } from "../provider/credential-scope-context"
 import { updateMessengerSettingAction } from "./update-messenger-settings.action"
 
 export function MessengerSettings({
   publicConfig,
+  isInherited = false,
 }: {
   publicConfig: MessengerCredentialPublic | null
+  isInherited?: boolean
 }) {
   const t = useTranslations()
   const { handleCopy } = useClipboard()
-  const [webhookUrl, setWebhookUrl] = useState<string>("")
-  const [authCallbackUrl, setAuthCallbackUrl] = useState<string>("")
-  useEffect(() => {
-    setWebhookUrl(
-      new URL(
-        "/integrations/messenger/webhook",
-        window.location.origin,
-      ).toString(),
-    )
-    setAuthCallbackUrl(
-      new URL(
-        "/integrations/messenger/callback",
-        window.location.origin,
-      ).toString(),
-    )
-  }, [])
+  // Webhook + OAuth callback URLs must live on the fixed, provider-registered
+  // broker host — never the reseller's white-label custom domain, which Meta
+  // cannot reach. Resellers using their own Facebook app whitelist these URIs.
+  const webhookUrl = buildBrokerCallbackUrl("/integrations/messenger/webhook")
+  const authCallbackUrl = buildBrokerCallbackUrl(
+    "/integrations/messenger/callback",
+  )
 
   return (
     <Card>
@@ -75,11 +70,14 @@ export function MessengerSettings({
               <div className="font-bold">{t("fields.appId.label")}:</div>
               <div className="flex items-center gap-2">
                 <span className="truncate">{publicConfig.clientId}</span>
-                <Button className="flex-none" size="icon" variant="outline">
-                  <CopyIcon
-                    className="size-4"
-                    onClick={handleCopy(publicConfig.clientId)}
-                  />
+                <Button
+                  className="flex-none"
+                  onClick={() => handleCopy(publicConfig.clientId)}
+                  size="icon"
+                  type="button"
+                  variant="outline"
+                >
+                  <CopyIcon className="size-4" />
                 </Button>
               </div>
             </div>
@@ -90,11 +88,14 @@ export function MessengerSettings({
               </div>
               <div className="flex items-center gap-2">
                 <span className="truncate">{authCallbackUrl}</span>
-                <Button className="flex-none" size="icon" variant="outline">
-                  <CopyIcon
-                    className="size-4"
-                    onClick={handleCopy(authCallbackUrl)}
-                  />
+                <Button
+                  className="flex-none"
+                  onClick={() => handleCopy(authCallbackUrl)}
+                  size="icon"
+                  type="button"
+                  variant="outline"
+                >
+                  <CopyIcon className="size-4" />
                 </Button>
               </div>
             </div>
@@ -103,11 +104,14 @@ export function MessengerSettings({
               <div className="font-bold">{t("fields.webhookUrl.label")}:</div>
               <div className="flex items-center gap-2">
                 <span className="truncate">{webhookUrl}</span>
-                <Button className="flex-none" size="icon" variant="outline">
-                  <CopyIcon
-                    className="size-4"
-                    onClick={handleCopy(webhookUrl)}
-                  />
+                <Button
+                  className="flex-none"
+                  onClick={() => handleCopy(webhookUrl)}
+                  size="icon"
+                  type="button"
+                  variant="outline"
+                >
+                  <CopyIcon className="size-4" />
                 </Button>
               </div>
             </div>
@@ -118,19 +122,20 @@ export function MessengerSettings({
               </div>
               <div className="flex items-center gap-2">
                 <span className="truncate">{publicConfig.verifyToken}</span>
-                <Button className="flex-none" size="icon" variant="outline">
-                  <CopyIcon
-                    className="size-4"
-                    onClick={handleCopy(publicConfig.verifyToken)}
-                  />
+                <Button
+                  className="flex-none"
+                  onClick={() => handleCopy(publicConfig.verifyToken)}
+                  size="icon"
+                  type="button"
+                  variant="outline"
+                >
+                  <CopyIcon className="size-4" />
                 </Button>
               </div>
             </div>
           </div>
         ) : (
-          <p className="text-muted-foreground text-sm">
-            {t("messages.needToAddSettings")}
-          </p>
+          <CredentialFallbackNote isInherited={isInherited} />
         )}
       </CardContent>
     </Card>

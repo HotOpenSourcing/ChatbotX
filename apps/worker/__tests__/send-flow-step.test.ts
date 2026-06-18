@@ -14,7 +14,7 @@ const {
   mockFindContactInbox,
   mockBroadcast,
   mockEmit,
-  mockResolvePlatformSettings,
+  mockresolveTenantSettings,
   mockResolveContactVariables,
   mockUploadFileFromUrl,
   mockSendFlowStepToChannel,
@@ -84,7 +84,7 @@ const {
     mockFindContactInbox,
     mockBroadcast: vi.fn(),
     mockEmit: vi.fn().mockResolvedValue(undefined),
-    mockResolvePlatformSettings: vi
+    mockresolveTenantSettings: vi
       .fn()
       .mockResolvedValue({ storageUrl: "https://storage.example.com" }),
     mockResolveContactVariables: vi
@@ -119,6 +119,29 @@ vi.mock("@chatbotx.io/database/repositories", () => ({
   createMessageRepository: mockCreateMessageRepository,
 }))
 
+vi.mock("@chatbotx.io/analytics", () => ({
+  botMessageFallbackReasons: {
+    enum: {
+      button_not_found: "button_not_found",
+      handler_error_to_fallback: "handler_error_to_fallback",
+      no_content: "no_content",
+      unsupported_message_type: "unsupported_message_type",
+    },
+  },
+  botMessageResults: { enum: { fallback: "fallback", success: "success" } },
+  botMessageRouteTypes: {
+    enum: { agent: "agent", fallback: "fallback", flow: "flow" },
+  },
+  trackingResponseTypes: {
+    enum: {
+      ai_agent: "ai_agent",
+      automated_response: "automated_response",
+      flow: "flow",
+      none: "none",
+    },
+  },
+}))
+
 vi.mock("@chatbotx.io/database/client", () => ({
   db: {
     insert: mockDbInsert,
@@ -145,7 +168,7 @@ vi.mock("@chatbotx.io/database/schema", () => ({
 vi.mock("@chatbotx.io/business", () => ({
   broadcastToWorkspaceParty: mockBroadcast,
   broadcastToGuestParty: vi.fn().mockResolvedValue(undefined),
-  resolvePlatformSettings: mockResolvePlatformSettings,
+  resolveTenantSettings: mockresolveTenantSettings,
 }))
 
 vi.mock("@chatbotx.io/business/utils", () => ({
@@ -272,7 +295,7 @@ describe("sendFlowStep", () => {
       create: mockRepositoryCreate,
       createWithAttachments: mockRepositoryCreateWithAttachments,
     })
-    mockResolvePlatformSettings.mockResolvedValue({
+    mockresolveTenantSettings.mockResolvedValue({
       storageUrl: "https://storage.example.com",
     })
     mockResolveContactVariables.mockImplementation(
@@ -447,7 +470,7 @@ describe("sendChatMessage", () => {
       create: mockRepositoryCreate,
       createWithAttachments: mockRepositoryCreateWithAttachments,
     })
-    mockResolvePlatformSettings.mockResolvedValue({
+    mockresolveTenantSettings.mockResolvedValue({
       storageUrl: "https://storage.example.com",
     })
     mockRepositoryCreate.mockResolvedValue({

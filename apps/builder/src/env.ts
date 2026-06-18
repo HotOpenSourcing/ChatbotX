@@ -21,6 +21,12 @@ export const env = createEnv({
   },
   client: {
     NEXT_PUBLIC_BUILDER_URL: z.url(),
+    // Dedicated, brand-neutral broker host — the canonical provider-facing origin
+    // for both OAuth redirect_uris and host-validated webhooks (WhatsApp/Meta,
+    // TikTok). The single redirect_uri registered with every provider; callbacks
+    // relay back to the originating domain. Optional — falls back to
+    // NEXT_PUBLIC_BUILDER_URL via getBrokerUrl().
+    NEXT_PUBLIC_BROKER_URL: z.url().optional(),
     NEXT_PUBLIC_EDITION: editionRule,
     NEXT_PUBLIC_INTERNAL_WS_URL: z
       .url()
@@ -31,10 +37,20 @@ export const env = createEnv({
       .optional()
       .default("http://localhost:9000/chatbotx/"),
     NEXT_PUBLIC_STORAGE_URL: z.url().optional(),
+    NEXT_PUBLIC_ALLOWED_DEV_ORIGINS: z
+      .string()
+      .optional()
+      .transform((val) =>
+        val
+          ?.split(",")
+          .map((v) => v.trim())
+          .filter(Boolean),
+      ),
   },
   experimental__runtimeEnv: {
     NEXT_PUBLIC_BUILDER_URL:
       clientEnv("NEXT_PUBLIC_BUILDER_URL") || "http://localhost:3123",
+    NEXT_PUBLIC_BROKER_URL: clientEnv("NEXT_PUBLIC_BROKER_URL"),
     NEXT_PUBLIC_INTERNAL_WS_URL:
       clientEnv("NEXT_PUBLIC_INTERNAL_WS_URL") || "http://localhost:1999",
     NEXT_PUBLIC_INTERNAL_STORAGE_URL:
@@ -42,6 +58,9 @@ export const env = createEnv({
       "http://localhost:9000/chatbotx/",
     NEXT_PUBLIC_EDITION: clientEnv("NEXT_PUBLIC_EDITION") || "community",
     NEXT_PUBLIC_STORAGE_URL: clientEnv("NEXT_PUBLIC_STORAGE_URL"),
+    NEXT_PUBLIC_ALLOWED_DEV_ORIGINS: clientEnv(
+      "NEXT_PUBLIC_ALLOWED_DEV_ORIGINS",
+    ),
   },
   emptyStringAsUndefined: true,
   skipValidation: process.env.SKIP_ENV_CHECK === "true",

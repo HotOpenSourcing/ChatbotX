@@ -379,9 +379,44 @@ export const performActionMenus = (t: TranslationFn): MenuItem[] => [
         stepType: stepTypes.enum.optOutEmail,
       },
       {
+        label: t("flows.actions.activeCampaignSyncContact"),
+        icon: MailIcon,
+        stepType: stepTypes.enum.activeCampaignSyncContact,
+      },
+      {
+        label: t("flows.actions.getResponseAddContact"),
+        icon: MailIcon,
+        stepType: stepTypes.enum.getResponseAddContact,
+      },
+      {
         label: t("flows.actions.mailchimpAddMember"),
         icon: MailIcon,
         stepType: stepTypes.enum.mailchimpAddMember,
+      },
+      {
+        label: t("flows.actions.mailerLiteAddSubscriber"),
+        icon: MailIcon,
+        stepType: stepTypes.enum.mailerLiteAddSubscriber,
+      },
+      {
+        label: t("flows.actions.moosendCreateContact"),
+        icon: MailIcon,
+        stepType: stepTypes.enum.moosendCreateContact,
+      },
+      {
+        label: t("flows.actions.dripSubscribeSubscriber"),
+        icon: MailIcon,
+        stepType: stepTypes.enum.dripSubscribeSubscriber,
+      },
+      {
+        label: t("flows.actions.sendGridAddContact"),
+        icon: MailIcon,
+        stepType: stepTypes.enum.sendGridAddContact,
+      },
+      {
+        label: t("flows.actions.klaviyoSyncProfile"),
+        icon: MailIcon,
+        stepType: stepTypes.enum.klaviyoSyncProfile,
       },
     ],
   },

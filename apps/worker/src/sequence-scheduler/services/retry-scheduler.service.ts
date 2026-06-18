@@ -19,6 +19,7 @@ export class RetrySchedulerService {
         and(
           eq(sequenceDispatchModel.id, dispatchId),
           eq(sequenceDispatchModel.workspaceId, workspaceId),
+          eq(sequenceDispatchModel.status, "running"),
         ),
       )
 
@@ -28,18 +29,20 @@ export class RetrySchedulerService {
   async markDispatchCanceled(
     dispatchId: string,
     workspaceId: string,
-    _reason: string,
+    reason: string,
   ): Promise<void> {
     await db
       .update(sequenceDispatchModel)
       .set({
         status: "canceled",
+        lastError: reason,
         updatedAt: new Date(),
       })
       .where(
         and(
           eq(sequenceDispatchModel.id, dispatchId),
           eq(sequenceDispatchModel.workspaceId, workspaceId),
+          eq(sequenceDispatchModel.status, "running"),
         ),
       )
   }

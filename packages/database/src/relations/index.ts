@@ -39,7 +39,7 @@ import { customFieldRelations } from "./custom-field"
 import { emailTopicRelations } from "./email-topic"
 import { auditLogRelations } from "./enterprise/audit-log"
 import { customDomainRelations } from "./enterprise/custom-domain"
-import { platformSettingRelations } from "./enterprise/platform-setting"
+import { tenantRelations } from "./enterprise/tenant"
 import { userQuotaRelations } from "./enterprise/user-quota"
 import { errorLogRelations } from "./error-log"
 import { fileRelations } from "./file"
@@ -55,14 +55,21 @@ import { inboxContactStatsRelations } from "./inbox-contact-stats"
 import { inboxTeamRelations } from "./inbox-team"
 import { inboxTeamMemberRelations } from "./inbox-team-member"
 import { integrationRelations } from "./integration"
+import { integrationActiveCampaignRelations } from "./integration-active-campaign"
 import { integrationClaudeRelations } from "./integration-claude"
 import { integrationDeepseekRelations } from "./integration-deepseek"
+import { integrationDripRelations } from "./integration-drip"
 import { integrationGeminiRelations } from "./integration-gemini"
+import { integrationGetResponseRelations } from "./integration-get-response"
 import { integrationGoogleSheetsRelations } from "./integration-google-sheets"
 import { integrationInstagramRelations } from "./integration-instagram"
+import { integrationKlaviyoRelations } from "./integration-klaviyo"
 import { integrationMailchimpRelations } from "./integration-mailchimp"
+import { integrationMailerLiteRelations } from "./integration-mailer-lite"
 import { integrationMessengerRelations } from "./integration-messenger"
+import { integrationMoosendRelations } from "./integration-moosend"
 import { integrationOpenaiRelations } from "./integration-openai"
+import { integrationSendGridRelations } from "./integration-sendgrid"
 import { integrationSmtpRelations } from "./integration-smtp"
 import { integrationTelegramRelations } from "./integration-telegram"
 import { integrationTiktokRelations } from "./integration-tiktok"
@@ -112,7 +119,7 @@ export const relations = {
   ...messageRelations,
   ...automatedResponseRelations,
   ...customDomainRelations,
-  ...platformSettingRelations,
+  ...tenantRelations,
   ...platformCredentialRelations,
   ...userQuotaRelations,
   ...contactCustomFieldRelations,
@@ -174,7 +181,14 @@ export const relations = {
   ...integrationTelegramRelations,
   ...integrationTiktokRelations,
   ...integrationInstagramRelations,
+  ...integrationActiveCampaignRelations,
+  ...integrationKlaviyoRelations,
   ...integrationMailchimpRelations,
+  ...integrationMailerLiteRelations,
+  ...integrationMoosendRelations,
+  ...integrationDripRelations,
+  ...integrationGetResponseRelations,
+  ...integrationSendGridRelations,
   ...flowAnalyticsSessionRelations,
   ...flowNodeStatRelations,
   ...contactOnSmartDelayRelations,

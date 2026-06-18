@@ -1,3 +1,4 @@
+import { activeCampaignSyncContactSchema } from "./steps/active-campaign-sync-contact"
 import { addContactNotesStepSchema } from "./steps/add-contact-notes"
 import { addContactTagStepSchema } from "./steps/add-contact-tag"
 import { aiAnalyzeImageSchema } from "./steps/ai-analyze-image"
@@ -17,16 +18,22 @@ import { clearCustomFieldStepSchema } from "./steps/clear-custom-field"
 import { countCharactersStepSchema } from "./steps/count-characters"
 import { deleteContactStepSchema } from "./steps/delete-contact"
 import { disableBotStepSchema } from "./steps/disable-bot"
+import { dripSubscribeSubscriberSchema } from "./steps/drip-subscribe-subscriber"
 import { enableBotStepSchema } from "./steps/enable-bot"
 import { followConversationStepSchema } from "./steps/follow-conversation"
 import { formatDateStepSchema } from "./steps/format-date"
 import { generateCodeStepSchema } from "./steps/generate-code"
 import { getDataFromJsonStepSchema } from "./steps/get-data-from-json"
+import { getResponseAddContactSchema } from "./steps/get-response-add-contact"
+import { klaviyoSyncProfileSchema } from "./steps/klaviyo-sync-profile"
 import { mailchimpAddMemberSchema } from "./steps/mailchimp-add-member"
+import { mailerLiteAddSubscriberSchema } from "./steps/mailer-lite-add-subscriber"
 import { markEmailVerifiedStepSchema } from "./steps/mark-email-verified"
+import { moosendCreateContactSchema } from "./steps/moosend-create-contact"
 import { optInEmailStepSchema } from "./steps/opt-in-email"
 import { optOutEmailStepSchema } from "./steps/opt-out-email"
 import { removeContactTagStepSchema } from "./steps/remove-contact-tag"
+import { sendGridAddContactSchema } from "./steps/sendgrid-add-contact"
 import { setCustomFieldStepSchema } from "./steps/set-custom-field"
 import { spreadsheetClearRowSchema } from "./steps/spreadsheet-clear-row"
 import { spreadsheetGetRowSchema } from "./steps/spreadsheet-get-row"
@@ -87,7 +94,14 @@ const emailSteps = [
   markEmailVerifiedStepSchema,
   optInEmailStepSchema,
   optOutEmailStepSchema,
+  activeCampaignSyncContactSchema,
+  getResponseAddContactSchema,
   mailchimpAddMemberSchema,
+  mailerLiteAddSubscriberSchema,
+  moosendCreateContactSchema,
+  dripSubscribeSubscriberSchema,
+  sendGridAddContactSchema,
+  klaviyoSyncProfileSchema,
 ]
 
 const flowSteps = [

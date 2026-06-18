@@ -15,15 +15,15 @@ This file summarizes how **ChatbotX** (this repository) is structured and how to
 
 ## Repository layout
 
-| Path | Role |
-|------|------|
-| `apps/builder` | **Next.js** web app (product UI). Default dev URL often `http://localhost:3123` (see `.env.example`). |
-| `apps/worker` | **BullMQ** (and related) background jobs: chat, AI, triggers, webhooks, analytics, sequences. |
-| `apps/realtime` | Realtime server; builder exposes `NEXT_PUBLIC_REALTIME_URL` (e.g. `http://localhost:1999`). |
-| `apps/cli` | Command-line client (`chatbotx-cli`). |
-| `apps/mcp-server` | MCP server exposing public API surfaces. |
-| `packages/*` | Shared libraries: `database` (Drizzle + PostgreSQL), `ui`, `public-apis`, `sdk`, `worker-config`, `ai`, etc. |
-| `integrations/*` | Channel and vendor integrations (WhatsApp, Messenger, Telegram, Zalo, webchat, SMTP, OpenAI, Google Sheets, …). |
+| Path              | Role                                                                                                                    |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `apps/builder`    | **Next.js** web app (product UI). Default dev URL often `http://localhost:3123` (see `.env.example`).                   |
+| `apps/worker`     | **BullMQ** (and related) background jobs: chat, AI, triggers, webhooks, analytics, sequences.                           |
+| `apps/realtime`   | Realtime server; builder exposes `NEXT_PUBLIC_REALTIME_URL` (e.g. `http://localhost:1999`).                             |
+| `apps/cli`        | Command-line client (`chatbotx-cli`).                                                                                   |
+| `apps/mcp-server` | MCP server exposing public API surfaces.                                                                                |
+| `packages/*`      | Shared libraries: `database` (Drizzle + PostgreSQL), `ui`, `public-apis`, `sdk`, `worker-config`, `ai`, etc.            |
+| `integrations/*`  | Channel and vendor integrations (WhatsApp, Messenger, Telegram, Zalo, TikTok, webchat, SMTP, OpenAI, Google Sheets, …). |
 
 ## Stack (high level)
 
@@ -128,6 +128,8 @@ These are the most common mistakes — read before writing any code:
 
 9. **No direct `db` in app layer** — Code in `apps/` and `integrations/` must NOT import `db` from `@chatbotx.io/database/client`. All database access goes through a service (`packages/business/`) or repository (`packages/database/src/repositories/`). Existing direct imports are legacy exceptions. See `.agents/rules/data-access.md`.
 
+10. **White-label tenancy** — `User`/`Workspace` carry a `tenantId` that defaults to `ROOT_TENANT_ID` (`"1"`, the platform). `User` email is unique *per tenant* (`User_email_tenant_key`), never globally. Derive a new workspace's tenant via `workspaceService.resolveTenantForOwner` (owner-derived, never host-derived) — don't set `tenantId` from request input. Never accept or return `tenantId` from client input in auth: the tenant-scoped adapter stamps it from `getTenantId()`. See `docs/tenancy.md`.
+
 ## Git conventions
 
 See **`.agents/rules/git.md`** for the full canonical rules (commit format, branch naming, staging, PRs, changelog).
@@ -137,5 +139,6 @@ See **`.agents/rules/git.md`** for the full canonical rules (commit format, bran
 - Human-facing docs: [chatbotx.io/docs](https://chatbotx.io/docs) (including Quick Start).
 - Tech stack details: `docs/tech-stack.md`
 - Request flow diagrams: `docs/request-workflow.md`
+- White-label tenancy model: `docs/tenancy.md`
 
 When unsure, search the codebase for an existing feature that resembles the request and mirror its structure, imports, and error-handling style.

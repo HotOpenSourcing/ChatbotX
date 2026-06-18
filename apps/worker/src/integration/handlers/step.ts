@@ -26,6 +26,7 @@ import {
   integrationQueue,
 } from "@chatbotx.io/worker-config"
 import { logger } from "../../lib/logger"
+import { syncActiveCampaignContact } from "./active-campaign-handler"
 import { handleAIAnalyzeImage } from "./analyze-image"
 import {
   addContactNotes,
@@ -43,15 +44,21 @@ import {
   unsubscribeBroadcast,
 } from "./contact"
 import { handleAIDeleteMessageHistory } from "./delete-message-history"
+import { subscribeDripSubscriber } from "./drip-handler"
 import { handleAIEditImage } from "./edit-image"
 import { handleAIExtractData } from "./extract-data/index"
 import { type ExecuteStepProps, seekConnectedNode } from "./flow-utils"
 import { handleAIGenerateImage } from "./generate-image"
 import { handleAIGenerateText } from "./generate-text"
 import { handleAIGenerateTextAgent } from "./generate-text-agent"
+import { addGetResponseContact } from "./get-response-handler"
 import { getUserData } from "./get-user-data"
+import { syncKlaviyoProfile } from "./klaviyo-handler"
 import { addMailchimpMember } from "./mailchimp-handler"
+import { addMailerLiteSubscriber } from "./mailer-lite-handler"
+import { addOrUpdateMoosendContact } from "./moosend-handler"
 import { sendEmail } from "./send-email"
+import { addSendGridContact } from "./sendgrid-handler"
 import { handleAISpeechToText } from "./speech-to-text"
 import {
   stepArchiveConversation,
@@ -349,7 +356,14 @@ export const flowStepHandlers: Record<
   [stepTypes.enum.getDataFromJson]: getDataFromJSON,
   [stepTypes.enum.landingPage]: undefined,
   [stepTypes.enum.markEmailVerified]: markEmailVerified,
+  [stepTypes.enum.activeCampaignSyncContact]: syncActiveCampaignContact,
+  [stepTypes.enum.getResponseAddContact]: addGetResponseContact,
+  [stepTypes.enum.dripSubscribeSubscriber]: subscribeDripSubscriber,
   [stepTypes.enum.mailchimpAddMember]: addMailchimpMember,
+  [stepTypes.enum.mailerLiteAddSubscriber]: addMailerLiteSubscriber,
+  [stepTypes.enum.klaviyoSyncProfile]: syncKlaviyoProfile,
+  [stepTypes.enum.moosendCreateContact]: addOrUpdateMoosendContact,
+  [stepTypes.enum.sendGridAddContact]: addSendGridContact,
   [stepTypes.enum.notifyAgent]: undefined,
   [stepTypes.enum.openWebsite]: undefined,
   [stepTypes.enum.aiAnalyzeImage]: handleAIAnalyzeImage,

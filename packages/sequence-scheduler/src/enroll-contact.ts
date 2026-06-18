@@ -7,6 +7,7 @@ import { getContactInboxes } from "./contacts-on-sequences"
 import { createDispatch } from "./dispatch-manager"
 
 type DrizzleClient = typeof db | Transaction
+type DispatchToSchedule = { id: string; bucket: number; runAtMs: string }
 
 export type EnrollContactParams = {
   workspaceId: string
@@ -26,58 +27,77 @@ export async function enrollContactInSequence(params: EnrollContactParams) {
     nextRunAt,
     nextStepId,
     enrolledAt = new Date(),
-    client = db,
+    client,
   } = params
 
-  const existing = await client.query.contactsOnSequenceModel.findFirst({
-    where: {
-      contactId,
-      sequenceId,
-      workspaceId,
-    },
-    columns: { id: true },
-  })
+  const enroll = async (
+    dbClient: DrizzleClient,
+  ): Promise<DispatchToSchedule[]> => {
+    const existing = await dbClient.query.contactsOnSequenceModel.findFirst({
+      where: {
+        contactId,
+        sequenceId,
+        workspaceId,
+      },
+      columns: { id: true },
+    })
 
-  if (existing) {
+    if (existing) {
+      return []
+    }
+
+    const enrollmentId = createId()
+    const [enrollment] = await dbClient
+      .insert(contactsOnSequenceModel)
+      .values({
+        id: enrollmentId,
+        workspaceId,
+        contactId,
+        sequenceId,
+        currentStep: 0,
+        status: "active",
+        nextRunAt,
+        nextStepId,
+        enrolledAt,
+      })
+      .returning({ id: contactsOnSequenceModel.id })
+
+    if (!(nextStepId && enrollment)) {
+      return []
+    }
+
+    const contactInboxes = await getContactInboxes(workspaceId, contactId)
+    const dispatches: DispatchToSchedule[] = []
+
+    for (const contactInbox of contactInboxes) {
+      const dispatch = await createDispatch({
+        workspaceId,
+        sequenceId,
+        contactId,
+        contactInboxId: contactInbox.id,
+        stepId: nextStepId,
+        enrollmentId: enrollment.id,
+        runAt: nextRunAt,
+        client: dbClient,
+      })
+
+      dispatches.push(dispatch)
+    }
+
+    return dispatches
+  }
+
+  const dispatches = client
+    ? await enroll(client)
+    : await db.transaction(enroll)
+
+  if (dispatches.length === 0) {
     return
   }
 
-  const enrollmentId = createId()
-  const [enrollment] = await client
-    .insert(contactsOnSequenceModel)
-    .values({
-      id: enrollmentId,
-      workspaceId,
-      contactId,
-      sequenceId,
-      currentStep: 0,
-      status: "active",
-      nextRunAt,
-      nextStepId,
-      enrolledAt,
-    })
-    .returning({ id: contactsOnSequenceModel.id })
-
-  if (!(nextStepId && enrollment)) {
-    return
-  }
-
-  const contactInboxes = await getContactInboxes(workspaceId, contactId)
-
-  for (const contactInbox of contactInboxes) {
-    const dispatch = await createDispatch({
-      workspaceId,
-      sequenceId,
-      contactId,
-      contactInboxId: contactInbox.id,
-      stepId: nextStepId,
-      enrollmentId: enrollment.id,
-      runAt: nextRunAt,
-      client,
-    })
-
-    const redisClient = await sequenceConnections.useExisting()
-    const scheduler = new SchedulerClient(redisClient)
+  const redisClient = await sequenceConnections.useExisting()
+  const scheduler = new SchedulerClient(redisClient)
+  for (const dispatch of dispatches) {
     await scheduler.addToSchedule(
       dispatch.bucket,
       dispatch.id,
@@ -99,42 +119,29 @@ export async function enrollContactsInSequenceBulk(
   params: EnrollContactsBulkParams,
 ) {
   const { workspaceId, enrollments, enrolledAt = new Date() } = params
-  const createdEnrollments = await db.transaction(async (tx) => {
-    await tx
-      .insert(contactsOnSequenceModel)
-      .values(
-        enrollments.map((e) => ({
-          id: createId(),
-          workspaceId,
-          contactId: e.contactId,
-          sequenceId: e.sequenceId,
-          currentStep: 0,
-          status: "active" as const,
-          nextRunAt: e.nextRunAt,
-          nextStepId: e.nextStepId,
-          enrolledAt,
-        })),
-      )
-      .onConflictDoNothing()
-
-    const contactIds = enrollments.map((e) => e.contactId)
-    const sequenceIds = enrollments.map((e) => e.sequenceId)
-
-    return await tx.query.contactsOnSequenceModel.findMany({
-      where: {
+  const createdEnrollments = await db
+    .insert(contactsOnSequenceModel)
+    .values(
+      enrollments.map((e) => ({
+        id: createId(),
         workspaceId,
-        contactId: { in: contactIds },
-        sequenceId: { in: sequenceIds },
-      },
-      columns: {
-        id: true,
-        contactId: true,
-        sequenceId: true,
-        nextRunAt: true,
-        nextStepId: true,
-      },
+        contactId: e.contactId,
+        sequenceId: e.sequenceId,
+        currentStep: 0,
+        status: "active" as const,
+        nextRunAt: e.nextRunAt,
+        nextStepId: e.nextStepId,
+        enrolledAt,
+      })),
+    )
+    .onConflictDoNothing()
+    .returning({
+      id: contactsOnSequenceModel.id,
+      contactId: contactsOnSequenceModel.contactId,
+      sequenceId: contactsOnSequenceModel.sequenceId,
+      nextRunAt: contactsOnSequenceModel.nextRunAt,
+      nextStepId: contactsOnSequenceModel.nextStepId,
     })
-  })
   const redisClient = await sequenceConnections.useExisting()
   const scheduler = new SchedulerClient(redisClient)
   for (const enrollment of createdEnrollments) {

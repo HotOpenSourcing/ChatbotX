@@ -18,6 +18,7 @@ import { maintainMacPartitions } from "./handlers/maintain-mac-partitions"
 import { prepareBroadcast } from "./handlers/prepare-broadcast"
 import { processBroadcastContacts } from "./handlers/process-broadcast-contacts"
 import { purgeCoexistStaging } from "./handlers/purge-coexist-staging"
+import { reconcileBroadcasts } from "./handlers/reconcile-broadcasts"
 import { refreshZaloTokens } from "./handlers/refresh-zalo-tokens"
 import { registerSchedules } from "./handlers/register-schedules"
 import { scanCoexistRuns } from "./handlers/scan-coexist-runs"
@@ -56,11 +57,15 @@ async function startScheduleWorker() {
           return
 
         case ScheduleJobData.sendBroadcast:
-          await processBroadcastContacts()
+          await processBroadcastContacts(job.data.data.broadcastId)
           return
 
         case ScheduleJobData.finalizeBroadcasts:
           await finalizeBroadcasts()
+          return
+
+        case ScheduleJobData.reconcileBroadcasts:
+          await reconcileBroadcasts()
           return
 
         case ScheduleJobData.evaluateTriggers:
@@ -110,6 +115,23 @@ async function startScheduleWorker() {
       logger.error(err, `Job ${job.id} has failed`)
     }
   })
+
+  let isShuttingDown = false
+  async function shutdown() {
+    if (isShuttingDown) {
+      return
+    }
+    isShuttingDown = true
+    try {
+      await worker.close()
+      process.exit(0)
+    } catch (err) {
+      logger.error(err, "[ScheduleWorker] Error during shutdown")
+      process.exit(1)
+    }
+  }
+  process.once("SIGINT", shutdown)
+  process.once("SIGTERM", shutdown)
 }
 
 startScheduleWorker().catch((err) => {

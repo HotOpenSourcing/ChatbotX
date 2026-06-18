@@ -26,9 +26,10 @@ import { useHookFormAction } from "@next-safe-action/adapter-react-hook-form/hoo
 import { CopyIcon, Loader2Icon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { toast } from "sonner"
 import { useClipboard } from "@/hooks/use-clipboard"
+import { buildBrokerCallbackUrl } from "@/lib/oauth-broker"
 import { updateStripeSettingsAction } from "./update-stripe-settings.action"
 
 export function StripeSettings({
@@ -38,15 +39,11 @@ export function StripeSettings({
 }) {
   const t = useTranslations()
   const { handleCopy } = useClipboard()
-  const [webhookUrl, setWebhookUrl] = useState<string>("")
-  useEffect(() => {
-    setWebhookUrl(
-      new URL(
-        "/integrations/stripe/webhook",
-        window.location.origin,
-      ).toString(),
-    )
-  }, [])
+
+  // Webhook URL must live on the fixed, canonical broker host — never the
+  // reseller's white-label custom domain. Stripe signature verification is
+  // host-independent, so the broker host receives and validates events.
+  const webhookUrl = buildBrokerCallbackUrl("/integrations/stripe/webhook")
 
   return (
     <Card>
@@ -67,11 +64,14 @@ export function StripeSettings({
               </div>
               <div className="flex items-center gap-2">
                 <span className="truncate">{publicConfig.publishableKey}</span>
-                <Button className="flex-none" size="icon" variant="outline">
-                  <CopyIcon
-                    className="size-4"
-                    onClick={handleCopy(publicConfig.publishableKey)}
-                  />
+                <Button
+                  className="flex-none"
+                  onClick={() => handleCopy(publicConfig.publishableKey)}
+                  size="icon"
+                  type="button"
+                  variant="outline"
+                >
+                  <CopyIcon className="size-4" />
                 </Button>
               </div>
             </div>
@@ -80,11 +80,14 @@ export function StripeSettings({
               <div className="font-bold">{t("fields.verifyToken.label")}:</div>
               <div className="flex items-center gap-2">
                 <span className="truncate">{publicConfig.verifyToken}</span>
-                <Button className="flex-none" size="icon" variant="outline">
-                  <CopyIcon
-                    className="size-4"
-                    onClick={handleCopy(publicConfig.verifyToken)}
-                  />
+                <Button
+                  className="flex-none"
+                  onClick={() => handleCopy(publicConfig.verifyToken)}
+                  size="icon"
+                  type="button"
+                  variant="outline"
+                >
+                  <CopyIcon className="size-4" />
                 </Button>
               </div>
             </div>
@@ -93,11 +96,14 @@ export function StripeSettings({
               <div className="font-bold">Webhook URL:</div>
               <div className="flex items-center gap-2">
                 <span className="truncate">{webhookUrl}</span>
-                <Button className="flex-none" size="icon" variant="outline">
-                  <CopyIcon
-                    className="size-4"
-                    onClick={handleCopy(webhookUrl)}
-                  />
+                <Button
+                  className="flex-none"
+                  onClick={() => handleCopy(webhookUrl)}
+                  size="icon"
+                  type="button"
+                  variant="outline"
+                >
+                  <CopyIcon className="size-4" />
                 </Button>
               </div>
             </div>

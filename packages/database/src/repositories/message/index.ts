@@ -4,8 +4,10 @@ export {
   type CreateMessageInput,
   type CreateMessageResult,
   type DistributedLock,
+  type FindAIContextMessagesOptions,
   type FindLastByConversationOptions,
   type FindManyByConversationOptions,
+  type FindTriggerMessageOptions,
   type IMessageRepository,
   type ListMessagesQuery,
   MessageRepository,
@@ -24,6 +26,9 @@ export function getSafeSinceTime(
     return
   }
   const ts = time instanceof Date ? time.getTime() : time
+  if (!Number.isFinite(ts)) {
+    return
+  }
 
   if (bufferMs !== undefined) {
     // Explicit buffer: subtract then floor to hour start (e.g. 1-year lookback for AI context)

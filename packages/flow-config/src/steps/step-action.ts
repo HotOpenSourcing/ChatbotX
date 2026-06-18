@@ -94,7 +94,14 @@ export const stepTypes = z.enum([
   "spreadsheetClearRow",
 
   // Mail Marketing Operations (M_)
+  "activeCampaignSyncContact",
+  "getResponseAddContact",
   "mailchimpAddMember",
+  "mailerLiteAddSubscriber",
+  "moosendCreateContact",
+  "dripSubscribeSubscriber",
+  "sendGridAddContact",
+  "klaviyoSyncProfile",
 
   // Sequence Operations (Q_)
   "subscribeSequence",
