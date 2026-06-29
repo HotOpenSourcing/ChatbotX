@@ -29,6 +29,12 @@ EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
 
+DO $$ BEGIN
+  CREATE TYPE "messageKind" AS ENUM ('message', 'comment');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
 -- Create Message table (without FK to main DB tables)
 CREATE TABLE IF NOT EXISTS "Message" (
   "id" bigint NOT NULL,
@@ -44,8 +50,19 @@ CREATE TABLE IF NOT EXISTS "Message" (
   "senderType" "senderType" NOT NULL,
   "senderId" bigint,
   "sourceId" text,
+  "deletedAt" timestamp(6) with time zone,
+  "type" "messageKind" NOT NULL DEFAULT 'message',
+  "parentId" text,
+  "attributes" jsonb,
   PRIMARY KEY ("id", "createdAt")
 );
+
+-- Add new columns if table already existed (idempotent for existing shards)
+ALTER TABLE "Message"
+  ADD COLUMN IF NOT EXISTS "deletedAt"   timestamp(6) with time zone,
+  ADD COLUMN IF NOT EXISTS "type"        "messageKind" NOT NULL DEFAULT 'message',
+  ADD COLUMN IF NOT EXISTS "parentId"    text,
+  ADD COLUMN IF NOT EXISTS "attributes"  jsonb;
 
 -- Convert Message table to TimescaleDB hypertable
 -- Partitioned by createdAt with 7-day chunks
@@ -103,6 +120,12 @@ CREATE INDEX IF NOT EXISTS "Message_contactInboxId_sourceId_createdAt_idx"
 CREATE UNIQUE INDEX IF NOT EXISTS "Message_source_dedup_idx"
   ON "Message" ("contactInboxId", "sourceId", "createdAt");
 
+CREATE INDEX IF NOT EXISTS "Message_conversationId_type_idx"
+  ON "Message" ("workspaceId", "conversationId", "type", "createdAt");
+
+CREATE INDEX IF NOT EXISTS "Message_parentId_idx"
+  ON "Message" ("workspaceId", "parentId", "type", "createdAt") WHERE "parentId" IS NOT NULL;
+
 -- ─────────────────────────────────────────────
 -- Indexes for Attachment table
 -- ─────────────────────────────────────────────
@@ -122,15 +145,15 @@ CREATE INDEX IF NOT EXISTS "Attachment_conversationId_idx"
 -- ─────────────────────────────────────────────
 ALTER TABLE "Message" SET (
   timescaledb.compress,
-  timescaledb.compress_segmentby = 'workspaceId,conversationId',
-  timescaledb.compress_orderby = 'createdAt DESC'
+  timescaledb.compress_segmentby = '"workspaceId","conversationId"',
+  timescaledb.compress_orderby = '"createdAt" DESC'
 );
 SELECT add_compression_policy('"Message"', INTERVAL '30 days', if_not_exists => TRUE);
 
 ALTER TABLE "Attachment" SET (
   timescaledb.compress,
-  timescaledb.compress_segmentby = 'workspaceId,conversationId',
-  timescaledb.compress_orderby = 'createdAt DESC'
+  timescaledb.compress_segmentby = '"workspaceId","conversationId"',
+  timescaledb.compress_orderby = '"createdAt" DESC'
 );
 SELECT add_compression_policy('"Attachment"', INTERVAL '30 days', if_not_exists => TRUE);
 
@@ -167,9 +190,11 @@ CREATE TABLE IF NOT EXISTS "_shard_meta" (
 );
 
 INSERT INTO "_shard_meta" ("key", "value")
-VALUES
-  ('schemaVersion', '1.0.0'),
-  ('initializedAt', now()::text)
+VALUES ('schemaVersion', '1.2.0')
+ON CONFLICT ("key") DO UPDATE SET "value" = '1.2.0', "updatedAt" = NOW();
+
+INSERT INTO "_shard_meta" ("key", "value")
+VALUES ('initializedAt', now()::text)
 ON CONFLICT ("key") DO NOTHING;
 
 -- Verify setup
@@ -179,5 +204,5 @@ BEGIN
   RAISE NOTICE 'Tables: Message (hypertable, 7-day chunks), Attachment (hypertable, 7-day chunks), _shard_meta';
   RAISE NOTICE 'Compression: enabled for chunks older than 30 days';
   RAISE NOTICE 'Dedup index: Message_source_dedup_idx on (contactInboxId, sourceId, createdAt)';
-  RAISE NOTICE 'Schema version: 1.0.0';
+  RAISE NOTICE 'Schema version: 1.1.0';
 END $$;

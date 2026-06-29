@@ -3,27 +3,45 @@ import {
   distributedLock as redisDistributedLock,
   withCache,
 } from "@chatbotx.io/redis"
-import { and, desc, eq, gt, gte, inArray, isNotNull, lt, or } from "drizzle-orm"
+import {
+  and,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNotNull,
+  lt,
+  or,
+  sql,
+} from "drizzle-orm"
 import {
   isMessageStorageError,
   MessageShardUnavailableError,
 } from "../../../errors"
 import { logger } from "../../../logger"
 import type {
+  AttachmentLookupRow,
   BulkCreateAttachmentInput,
+  BulkPatchContentAttributesParams,
   CreateAttachmentInput,
   CreateMessageInput,
   CreateMessageResult,
   DistributedLock,
   FindAIContextMessagesOptions,
+  FindAttachmentByIdParams,
   FindLastByConversationOptions,
   FindManyByConversationOptions,
+  FindManyBySourceIdsParams,
+  FindMessageByIdParams,
   FindTriggerMessageOptions,
   IMessageRepository,
   ListMessagesQuery,
+  MessageSourceRow,
   MessageWithAttachments,
   PaginatedMessages,
   PaginationCursor,
+  UpdateAttachmentParams,
 } from "../../../repositories/message/message-repository"
 import type { AttachmentModel, MessageModel } from "../../../types"
 import {
@@ -41,6 +59,7 @@ export { getSafeSinceTime } from "../../../repositories"
 
 const SHARD_RANGE_CACHE_TAG = "message-shard-range"
 const SHARD_RANGE_CACHE_TTL_S = 30
+const ATTACHMENT_FALLBACK_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000
 
 function compareMessageDesc(
   a: { id: string; createdAt: Date },
@@ -294,6 +313,150 @@ export class ShardedMessageRepository implements IMessageRepository {
     })
   }
 
+  updateMessageAttributes(
+    messageId: string,
+    workspaceId: string,
+    attributes: { liked: boolean; hidden: boolean },
+    createdAt: Date,
+  ): Promise<{ id: string } | null> {
+    return this.updateAcrossShards(
+      messageId,
+      workspaceId,
+      { attributes },
+      "updateMessageAttributes",
+      createdAt,
+    )
+  }
+
+  updateMessageText(
+    messageId: string,
+    workspaceId: string,
+    newText: string,
+    createdAt: Date,
+  ): Promise<{ id: string } | null> {
+    return this.updateAcrossShards(
+      messageId,
+      workspaceId,
+      { text: newText },
+      "updateMessageText",
+      createdAt,
+    )
+  }
+
+  async updateTextBySourceId(
+    sourceId: string,
+    workspaceId: string,
+    newText: string,
+  ): Promise<{ id: string } | null> {
+    // sourceId-based update: scan shards from the last 90 days (same window
+    // used by findBySourceId for parent-comment lookups).
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+    const writeShard = await this.shardManager.getWriteShardInfo(workspaceId)
+    const timeShards = await this.getShardsForRange(since, new Date())
+    const shards = this.mergeWriteShard(timeShards, writeShard)
+
+    for (const shardInfo of shards) {
+      try {
+        const client = await this.shardManager.getShardClient(shardInfo.shard)
+        const [row] = await client
+          .update(messageModel)
+          .set({ text: newText })
+          .where(
+            and(
+              eq(messageModel.sourceId, sourceId),
+              eq(messageModel.workspaceId, workspaceId),
+            ),
+          )
+          .returning({ id: messageModel.id })
+        if (row) {
+          return row as { id: string }
+        }
+      } catch (error) {
+        logger.warn(
+          { err: error, shardId: shardInfo.shard.id },
+          "Shard update failed in updateTextBySourceId",
+        )
+      }
+    }
+    return null
+  }
+
+  // Targets the 1-2 shards covering the message's createdAt plus the write
+  // shard (for back-dated imports). When createdAt is unknown it is resolved
+  // first via a lightweight SELECT, avoiding a full shard scan.
+  private async updateAcrossShards(
+    messageId: string,
+    workspaceId: string,
+    patch: Partial<typeof messageModel.$inferInsert>,
+    caller: string,
+    createdAt: Date,
+  ): Promise<{ id: string } | null> {
+    const timeRangeShards = await this.getShardsForRange(createdAt, createdAt)
+    const writeShard = await this.shardManager.getWriteShardInfo(workspaceId)
+    const shards = this.mergeWriteShard(timeRangeShards, writeShard)
+    if (shards.length === 0) {
+      return null
+    }
+
+    const perShard = await Promise.all(
+      shards.map(async (shardInfo) => {
+        try {
+          const client = await this.shardManager.getShardClient(shardInfo.shard)
+          return await client
+            .update(messageModel)
+            .set(patch)
+            .where(
+              and(
+                eq(messageModel.id, messageId),
+                eq(messageModel.workspaceId, workspaceId),
+                eq(messageModel.createdAt, createdAt),
+              ),
+            )
+            .returning({ id: messageModel.id })
+        } catch (error) {
+          logger.warn(
+            { err: error, shardId: shardInfo.shard.id },
+            `Shard update failed in ${caller}`,
+          )
+          return []
+        }
+      }),
+    )
+
+    return perShard.flat()[0] ?? null
+  }
+
+  async deleteAttachmentsByMessageId(
+    messageId: string,
+    workspaceId: string,
+    createdAt: Date,
+  ): Promise<void> {
+    const timeRangeShards = await this.getShardsForRange(createdAt, createdAt)
+    const writeShard = await this.shardManager.getWriteShardInfo(workspaceId)
+    const shards = this.mergeWriteShard(timeRangeShards, writeShard)
+
+    await Promise.allSettled(
+      shards.map(async (shardInfo) => {
+        try {
+          const client = await this.shardManager.getShardClient(shardInfo.shard)
+          await client
+            .delete(attachmentModel)
+            .where(
+              and(
+                eq(attachmentModel.messageId, messageId),
+                eq(attachmentModel.workspaceId, workspaceId),
+              ),
+            )
+        } catch (err) {
+          logger.warn(
+            { err, messageId },
+            "deleteAttachmentsByMessageId: shard failed",
+          )
+        }
+      }),
+    )
+  }
+
   async updateSourceId(
     id: string,
     sourceId: string,
@@ -306,6 +469,131 @@ export class ShardedMessageRepository implements IMessageRepository {
         .set({ sourceId })
         .where(eq(messageModel.id, id))
     })
+  }
+
+  async deleteBySourceId(
+    sourceId: string,
+    workspaceId: string,
+    createdAt: Date,
+  ): Promise<{ id: string }[]> {
+    const writeShard = await this.shardManager.getWriteShardInfo(workspaceId)
+
+    // Step 1: find parent DB id — search in createdAt shard + write shard only.
+    const parentTimeShards = await this.getShardsForRange(
+      createdAt,
+      endOfHour(createdAt),
+    )
+    const parentShards = this.mergeWriteShard(parentTimeShards, writeShard)
+
+    let parentDbId: string | null = null
+    for (const shardInfo of parentShards) {
+      try {
+        const client = await this.shardManager.getShardClient(shardInfo.shard)
+        const [parent] = await client
+          .select({ id: messageModel.id })
+          .from(messageModel)
+          .where(
+            and(
+              eq(messageModel.workspaceId, workspaceId),
+              eq(messageModel.sourceId, sourceId),
+            ),
+          )
+          .limit(1)
+        if (parent) {
+          parentDbId = parent.id
+          break
+        }
+      } catch (error) {
+        logger.warn(
+          { err: error, shardId: shardInfo.shard.id },
+          "Shard query failed while looking up parent in deleteBySourceId",
+        )
+      }
+    }
+
+    // Step 2: soft-delete parent + children.
+    // Parent lives in its createdAt shard; children (replies) can be in any
+    // shard from createdAt onwards.
+    const childTimeShards = await this.getShardsForRange(createdAt, new Date())
+    const shards = this.mergeWriteShard(childTimeShards, writeShard)
+
+    if (shards.length === 0) {
+      return []
+    }
+
+    const perShard = await Promise.all(
+      shards.map(async (shardInfo) => {
+        try {
+          const client = await this.shardManager.getShardClient(shardInfo.shard)
+          return await client
+            .update(messageModel)
+            .set({ deletedAt: new Date() })
+            .where(
+              and(
+                eq(messageModel.workspaceId, workspaceId),
+                or(
+                  eq(messageModel.sourceId, sourceId),
+                  parentDbId
+                    ? eq(messageModel.parentId, parentDbId)
+                    : undefined,
+                ),
+              ),
+            )
+            .returning({ id: messageModel.id })
+        } catch (error) {
+          logger.warn(
+            { err: error, shardId: shardInfo.shard.id },
+            "Shard update failed in deleteBySourceId",
+          )
+          return []
+        }
+      }),
+    )
+
+    const ids = new Set<string>()
+    for (const rows of perShard) {
+      for (const row of rows) {
+        ids.add(row.id)
+      }
+    }
+    return [...ids].map((id) => ({ id }))
+  }
+
+  async deleteById(
+    id: string,
+    workspaceId: string,
+    createdAt: Date,
+  ): Promise<{ id: string }[]> {
+    const shards = await this.getShardsForRange(createdAt, createdAt)
+    if (shards.length === 0) {
+      return []
+    }
+
+    for (const shardInfo of shards) {
+      try {
+        const client = await this.shardManager.getShardClient(shardInfo.shard)
+        const rows = await client
+          .update(messageModel)
+          .set({ deletedAt: new Date() })
+          .where(
+            and(
+              eq(messageModel.workspaceId, workspaceId),
+              eq(messageModel.id, id),
+              eq(messageModel.createdAt, createdAt),
+            ),
+          )
+          .returning({ id: messageModel.id })
+        if (rows.length > 0) {
+          return rows as { id: string }[]
+        }
+      } catch (error) {
+        logger.warn(
+          { err: error, shardId: shardInfo.shard.id },
+          "Shard update failed in deleteById",
+        )
+      }
+    }
+    return []
   }
 
   async bulkCreateAttachments(
@@ -443,10 +731,11 @@ export class ShardedMessageRepository implements IMessageRepository {
           message.createdAt,
         )
         if (existing) {
-          const existingWithAttachments = await this.findById(
-            existing.id,
-            existing.createdAt,
-          )
+          const existingWithAttachments = await this.findById({
+            id: existing.id,
+            createdAt: existing.createdAt,
+            workspaceId: message.workspaceId,
+          })
           return {
             result: existingWithAttachments ?? { ...existing, attachments: [] },
             isNew: false,
@@ -466,17 +755,12 @@ export class ShardedMessageRepository implements IMessageRepository {
     return { result: created, isNew: true }
   }
 
-  async findById(
-    id: string,
-    createdAt?: Date,
-  ): Promise<MessageWithAttachments | null> {
-    if (!createdAt) {
-      throw new Error(
-        "createdAt is required for findById in sharded repository",
-      )
-    }
-
-    const shards = await this.getShardsForRange(createdAt, createdAt)
+  async findById({
+    id,
+    createdAt,
+    workspaceId,
+  }: FindMessageByIdParams): Promise<MessageWithAttachments | null> {
+    const shards = await this.getConversationReadShards(createdAt, workspaceId)
     if (shards.length === 0) {
       return null
     }
@@ -493,6 +777,7 @@ export class ShardedMessageRepository implements IMessageRepository {
                 and(
                   eq(messageModel.id, id),
                   eq(messageModel.createdAt, createdAt),
+                  eq(messageModel.workspaceId, workspaceId),
                 ),
               )
               .limit(1)
@@ -786,6 +1071,213 @@ export class ShardedMessageRepository implements IMessageRepository {
     )[0]
   }
 
+  async findManyBySourceIds({
+    contactInboxIds,
+    sourceIds,
+    workspaceId,
+    sinceTime,
+  }: FindManyBySourceIdsParams): Promise<MessageSourceRow[]> {
+    if (contactInboxIds.length === 0 || sourceIds.length === 0) {
+      return []
+    }
+    if (!sinceTime) {
+      throw new Error(
+        "sinceTime is required for findManyBySourceIds in sharded repository",
+      )
+    }
+
+    const shards = await this.getConversationReadShards(sinceTime, workspaceId)
+    if (shards.length === 0) {
+      return []
+    }
+
+    const shardResults = await Promise.all(
+      shards.map(async (shardInfo): Promise<MessageSourceRow[]> => {
+        try {
+          return await this.shardManager.withShardClientForRead(
+            shardInfo.shard,
+            async (shardClient) =>
+              (await shardClient
+                .select({
+                  id: messageModel.id,
+                  conversationId: messageModel.conversationId,
+                  contactInboxId: messageModel.contactInboxId,
+                  sourceId: messageModel.sourceId,
+                  createdAt: messageModel.createdAt,
+                })
+                .from(messageModel)
+                .where(
+                  and(
+                    eq(messageModel.workspaceId, workspaceId),
+                    inArray(messageModel.contactInboxId, contactInboxIds),
+                    inArray(messageModel.sourceId, sourceIds),
+                    gte(messageModel.createdAt, sinceTime),
+                  ),
+                )) as MessageSourceRow[],
+          )
+        } catch (error) {
+          logger.warn(
+            { err: error, shardId: shardInfo.shard.id },
+            "Shard query failed in findManyBySourceIds",
+          )
+          return []
+        }
+      }),
+    )
+
+    return shardResults.flat()
+  }
+
+  async bulkPatchContentAttributes({
+    patches,
+    sinceTime,
+    workspaceId,
+  }: BulkPatchContentAttributesParams): Promise<void> {
+    if (patches.length === 0) {
+      return
+    }
+    if (!sinceTime) {
+      throw new Error(
+        "sinceTime is required for bulkPatchContentAttributes in sharded repository",
+      )
+    }
+
+    const shards = await this.getConversationReadShards(sinceTime, workspaceId)
+    if (shards.length === 0) {
+      return
+    }
+
+    const mergeJsonb = (overlay: Record<string, unknown>) =>
+      sql`COALESCE(${messageModel.contentAttributes}, '{}'::jsonb) || ${JSON.stringify(overlay)}::jsonb`
+
+    await Promise.all(
+      shards.map((shardInfo) =>
+        withShardRetry(async () => {
+          const shardClient = await this.shardManager.getShardClient(
+            shardInfo.shard,
+          )
+          await shardClient.transaction(async (tx) => {
+            for (const patch of patches) {
+              await tx
+                .update(messageModel)
+                .set({
+                  ...(patch.text === undefined ? {} : { text: patch.text }),
+                  contentAttributes: mergeJsonb(patch.overlay),
+                  updatedAt: new Date(),
+                })
+                .where(
+                  and(
+                    eq(messageModel.workspaceId, workspaceId),
+                    eq(messageModel.contactInboxId, patch.contactInboxId),
+                    eq(messageModel.sourceId, patch.sourceId),
+                    gte(messageModel.createdAt, sinceTime),
+                  ),
+                )
+            }
+          })
+        }),
+      ),
+    )
+  }
+
+  async findAttachmentById({
+    id,
+    workspaceId,
+  }: FindAttachmentByIdParams): Promise<AttachmentLookupRow | null> {
+    const selectAttachment = async (
+      shardClient: MessageShardDatabaseClient,
+    ) => {
+      const [row] = await shardClient
+        .select({
+          id: attachmentModel.id,
+          originPath: attachmentModel.originPath,
+          mimeType: attachmentModel.mimeType,
+          createdAt: attachmentModel.createdAt,
+        })
+        .from(attachmentModel)
+        .where(
+          and(
+            eq(attachmentModel.id, id),
+            eq(attachmentModel.workspaceId, workspaceId),
+          ),
+        )
+        .limit(1)
+
+      return (row as AttachmentLookupRow | undefined) ?? null
+    }
+
+    const writeShardResult = await withShardRetry(async () => {
+      const shardClient = await this.shardManager.getShardForWrite(workspaceId)
+      return selectAttachment(shardClient)
+    })
+    if (writeShardResult) {
+      return writeShardResult
+    }
+
+    const fallbackSinceTime = new Date(
+      Date.now() - ATTACHMENT_FALLBACK_LOOKBACK_MS,
+    )
+    fallbackSinceTime.setMinutes(0, 0, 0)
+    const shards = await this.getConversationReadShards(
+      fallbackSinceTime,
+      workspaceId,
+    )
+
+    for (const shardInfo of shards) {
+      try {
+        const found = await this.shardManager.withShardClientForRead(
+          shardInfo.shard,
+          selectAttachment,
+        )
+        if (found) {
+          return found
+        }
+      } catch (error) {
+        logger.warn(
+          { err: error, shardId: shardInfo.shard.id },
+          "Shard query failed in findAttachmentById",
+        )
+      }
+    }
+
+    return null
+  }
+
+  async updateAttachment({
+    id,
+    workspaceId,
+    createdAt,
+    fields,
+  }: UpdateAttachmentParams): Promise<void> {
+    const shards = await this.getConversationReadShards(createdAt, workspaceId)
+    if (shards.length === 0) {
+      return
+    }
+
+    await Promise.all(
+      shards.map((shardInfo) =>
+        withShardRetry(async () => {
+          const shardClient = await this.shardManager.getShardClient(
+            shardInfo.shard,
+          )
+          await shardClient
+            .update(attachmentModel)
+            .set({
+              ...fields,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(attachmentModel.id, id),
+                eq(attachmentModel.workspaceId, workspaceId),
+                eq(attachmentModel.createdAt, createdAt),
+              ),
+            )
+        }),
+      ),
+    )
+  }
+
   async findLastByConversation(
     conversationId: string,
     options?: FindLastByConversationOptions,
@@ -991,6 +1483,7 @@ export class ShardedMessageRepository implements IMessageRepository {
     ids: string[],
     contactInboxId: string,
     sinceTime?: Date,
+    workspaceId?: string,
   ): Promise<Pick<MessageModel, "id" | "text">[]> {
     if (ids.length === 0) {
       return []
@@ -1002,7 +1495,11 @@ export class ShardedMessageRepository implements IMessageRepository {
       )
     }
 
-    const shards = await this.getShardsForRange(sinceTime, new Date())
+    const timeRangeShards = await this.getShardsForRange(sinceTime, new Date())
+    const writeShard = workspaceId
+      ? await this.shardManager.getWriteShardInfo(workspaceId)
+      : null
+    const shards = this.mergeWriteShard(timeRangeShards, writeShard)
     if (shards.length === 0) {
       return []
     }

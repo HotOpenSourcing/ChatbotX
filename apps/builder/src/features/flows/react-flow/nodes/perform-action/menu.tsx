@@ -1,5 +1,9 @@
 import { stepTypes } from "@chatbotx.io/flow-config"
-import { SiClaude, SiGooglegemini } from "@icons-pack/react-simple-icons"
+import {
+  SiClaude,
+  SiGooglegemini,
+  SiMessenger,
+} from "@icons-pack/react-simple-icons"
 import {
   ArchiveIcon,
   BellOffIcon,
@@ -10,6 +14,8 @@ import {
   CircleEllipsisIcon,
   CodeIcon,
   CogIcon,
+  KeyboardIcon,
+  KeyboardOffIcon,
   Layers,
   Layers2,
   LayersPlus,
@@ -206,6 +212,33 @@ const PROVIDER_CONFIGS: ProviderConfig[] = [
       {
         stepType: stepTypes.enum.aiGenerateTextAgent,
         getLabel: stepWithAiName("fields.flows.aiGenerateTextAgent"),
+      },
+      {
+        stepType: stepTypes.enum.aiDeleteMessageHistory,
+        getLabel: stepWithAiName("fields.flows.aiDeleteMessageHistory"),
+      },
+    ],
+  },
+  {
+    label: "OpenRouter",
+    icon: BotIcon,
+    providerKey: "openrouter",
+    steps: [
+      {
+        stepType: stepTypes.enum.aiGenerateText,
+        getLabel: stepWithName("flows.aiGenerateText.label"),
+      },
+      {
+        stepType: stepTypes.enum.aiAnalyzeImage,
+        getLabel: stepWithName("flows.aiAnalyzeImage.label"),
+      },
+      {
+        stepType: stepTypes.enum.aiGenerateTextAgent,
+        getLabel: stepWithAiName("fields.flows.aiGenerateTextAgent"),
+      },
+      {
+        stepType: stepTypes.enum.aiExtractData,
+        getLabel: stepWithName("flows.aiExtractData.label"),
       },
       {
         stepType: stepTypes.enum.aiDeleteMessageHistory,
@@ -472,6 +505,28 @@ export const performActionMenus = (t: TranslationFn): MenuItem[] => [
         label: t("flows.actions.countCharacters"),
         icon: CalculatorIcon,
         stepType: stepTypes.enum.countCharacters,
+      },
+    ],
+  },
+  {
+    label: t("flows.actions.messenger"),
+    icon: SiMessenger,
+    stepType: null,
+    children: [
+      {
+        label: t("flows.actions.setMessengerUserPersistentMenu"),
+        icon: SiMessenger,
+        stepType: stepTypes.enum.setMessengerUserPersistentMenu,
+      },
+      {
+        label: t("flows.actions.enableMessengerComposer"),
+        icon: KeyboardIcon,
+        stepType: stepTypes.enum.enableMessengerComposer,
+      },
+      {
+        label: t("flows.actions.disableMessengerComposer"),
+        icon: KeyboardOffIcon,
+        stepType: stepTypes.enum.disableMessengerComposer,
       },
     ],
   },

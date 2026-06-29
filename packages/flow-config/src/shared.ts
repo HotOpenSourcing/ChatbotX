@@ -18,8 +18,10 @@ import { clearCustomFieldStepSchema } from "./steps/clear-custom-field"
 import { countCharactersStepSchema } from "./steps/count-characters"
 import { deleteContactStepSchema } from "./steps/delete-contact"
 import { disableBotStepSchema } from "./steps/disable-bot"
+import { disableMessengerComposerStepSchema } from "./steps/disable-messenger-composer"
 import { dripSubscribeSubscriberSchema } from "./steps/drip-subscribe-subscriber"
 import { enableBotStepSchema } from "./steps/enable-bot"
+import { enableMessengerComposerStepSchema } from "./steps/enable-messenger-composer"
 import { followConversationStepSchema } from "./steps/follow-conversation"
 import { formatDateStepSchema } from "./steps/format-date"
 import { generateCodeStepSchema } from "./steps/generate-code"
@@ -35,6 +37,7 @@ import { optOutEmailStepSchema } from "./steps/opt-out-email"
 import { removeContactTagStepSchema } from "./steps/remove-contact-tag"
 import { sendGridAddContactSchema } from "./steps/sendgrid-add-contact"
 import { setCustomFieldStepSchema } from "./steps/set-custom-field"
+import { setMessengerUserPersistentMenuStepSchema } from "./steps/set-messenger-user-persistent-menu"
 import { spreadsheetClearRowSchema } from "./steps/spreadsheet-clear-row"
 import { spreadsheetGetRowSchema } from "./steps/spreadsheet-get-row"
 import { spreadsheetGetRandomRowSchema } from "./steps/spreadsheet-random-row"
@@ -122,6 +125,12 @@ const aiSteps = [
   aiTextToSpeechSchema,
 ]
 
+const messengerSteps = [
+  setMessengerUserPersistentMenuStepSchema,
+  enableMessengerComposerStepSchema,
+  disableMessengerComposerStepSchema,
+]
+
 const googleSheetStep = [
   spreadsheetGetRowSchema,
   spreadsheetClearRowSchema,
@@ -140,4 +149,5 @@ export const actionSteps = [
   ...flowSteps,
   ...aiSteps,
   ...googleSheetStep,
+  ...messengerSteps,
 ]

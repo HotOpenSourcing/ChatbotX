@@ -69,6 +69,7 @@ import { integrationMailerLiteRelations } from "./integration-mailer-lite"
 import { integrationMessengerRelations } from "./integration-messenger"
 import { integrationMoosendRelations } from "./integration-moosend"
 import { integrationOpenaiRelations } from "./integration-openai"
+import { integrationOpenrouterRelations } from "./integration-openrouter"
 import { integrationSendGridRelations } from "./integration-sendgrid"
 import { integrationSmtpRelations } from "./integration-smtp"
 import { integrationTelegramRelations } from "./integration-telegram"
@@ -94,6 +95,7 @@ import { triggerContactHistoryRelations } from "./trigger-contact-history"
 import { triggerExecutionRelations } from "./trigger-execution"
 import { triggerStatsRelations } from "./trigger-stats"
 import { userRelations } from "./user"
+import { userPersistentMenuRelations } from "./user-persistent-menu"
 import { webhookRelations } from "./webhook"
 import { whatsappFlowRelations } from "./whatsapp-flow"
 import { whatsappMessageTemplateRelations } from "./whatsapp-message-template"
@@ -157,6 +159,7 @@ export const relations = {
   ...integrationClaudeRelations,
   ...integrationDeepseekRelations,
   ...integrationGeminiRelations,
+  ...integrationOpenrouterRelations,
   ...contactsOnBroadcastsRelations,
   ...contactsToTagsRelations,
   ...tagChannelRelations,
@@ -200,4 +203,5 @@ export const relations = {
   ...analyticsFlowNodeEventRelations,
   ...productRelations,
   ...coexistSyncRunRelations,
+  ...userPersistentMenuRelations,
 }

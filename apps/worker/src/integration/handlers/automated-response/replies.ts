@@ -1,5 +1,4 @@
 import {
-  aiPolicies,
   aiProviders,
   aiTimeouts,
   helpTexts,
@@ -10,6 +9,10 @@ import {
 import {
   type AIProviderInstance,
   aiContextService,
+  appendFabricationGuard,
+  appendHandoffPolicy,
+  appendKnowledgeBaseGuard,
+  appendToolOutputGuard,
   createAIProviderInstance,
   getAIIntegrationInDB,
   getAIToolset,
@@ -28,6 +31,10 @@ import type {
 } from "@chatbotx.io/database/types"
 import { contactVariableService } from "@chatbotx.io/variables"
 import {
+  IntegrationJobAction,
+  integrationQueue,
+} from "@chatbotx.io/worker-config"
+import {
   type LanguageModel,
   type ModelMessage,
   stepCountIs,
@@ -37,13 +44,14 @@ import {
 import { normalizeError } from "universal-error-normalizer"
 import { logger } from "../../../lib/logger"
 import { handoffExecutorService } from "../../../trigger/services/handoff-executor.service"
-import { sendMessageWithRender } from "../../utils/message"
+import { sendMessageAndWait, sendMessageWithRender } from "../../utils/message"
 import { createDocumentReaderExecutor } from "./system-tools/document-reader"
 import { createImageReaderExecutor } from "./system-tools/image-reader"
 import { createUrlReaderExecutor } from "./system-tools/url-reader"
 
 type ReplyByAIProps = {
   conversation: ConversationModel
+  contactInboxId: string
   messages: ModelMessage[]
   aiAgent: AIAgentModel
   triggerMessageId?: string
@@ -96,6 +104,7 @@ export async function replyByAI(
 
 function createReplyToolset(options: {
   abortSignal: AbortSignal
+  directSendTracker: { sent: boolean; sentText: string }
   model: LanguageModel
   modelId: string
   props: ReplyByAIProps
@@ -135,6 +144,23 @@ function createReplyToolset(options: {
       workspaceId: conversation.workspaceId,
       conversationId: conversation.id,
       contactId: conversation.contactId,
+      sendMessage: async (text: string) => {
+        options.directSendTracker.sent = true
+        options.directSendTracker.sentText = text
+        if (text) {
+          await sendMessageAndWait(conversation.id, text)
+        }
+      },
+      triggerFlow: async (flowId: string) => {
+        await integrationQueue.add(IntegrationJobAction.sendFlow, {
+          type: IntegrationJobAction.sendFlow,
+          data: {
+            conversationId: conversation.id,
+            contactInboxId: options.props.contactInboxId,
+            flowId,
+          },
+        })
+      },
     }),
     systemToolExecutors: {
       [systemFunctionNames.connectUserToHuman]: async (args, context) => {
@@ -424,8 +450,10 @@ async function runAIReply(
     })
     const model = providerInstance(selectedModelId)
 
+    const directSendTracker = { sent: false, sentText: "" }
     const toolset = await createReplyToolset({
       abortSignal,
+      directSendTracker,
       model,
       modelId: selectedModelId,
       props,
@@ -449,7 +477,13 @@ async function runAIReply(
       : promptBase
 
     const systemPrompt = appendUnavailableWebSearchPolicy(
-      appendHandoffPolicy(appendToolOutputGuard(completePrompt), tools),
+      appendHandoffPolicy(
+        appendKnowledgeBaseGuard(
+          appendFabricationGuard(appendToolOutputGuard(completePrompt), tools),
+          tools,
+        ),
+        tools,
+      ),
       toolset.webSearchOmitReason,
     )
 
@@ -464,6 +498,7 @@ async function runAIReply(
     let toolResultsCount = 0
     let toolErrorsCount = 0
 
+    const hasTools = Object.keys(tools).length > 0
     const result = await streamText({
       model,
       system: systemPrompt,
@@ -471,7 +506,7 @@ async function runAIReply(
       maxOutputTokens: aiAgent.maxOutputTokens,
       temperature: aiAgent.temperature,
       tools,
-      toolChoice: Object.keys(tools).length > 0 ? "auto" : "none",
+      toolChoice: hasTools ? "auto" : "none",
       stopWhen: stepCountIs(5),
       timeout: {
         totalMs: aiTimeouts.aiTotal,
@@ -538,8 +573,11 @@ async function runAIReply(
     const { messageCount, fullText } = await processStreamingText(
       result.textStream,
       async (_segment, parts) => {
+        if (directSendTracker.sent) {
+          return
+        }
         for (const part of parts) {
-          await sendMessageWithRender(conversation.id, part)
+          await sendMessageAndWait(conversation.id, part)
         }
       },
       { sendParts: true },
@@ -556,6 +594,37 @@ async function runAIReply(
       )
       return { messageCount: 0, fullText: "" }
     })
+
+    if (directSendTracker.sent) {
+      if (directSendTracker.sentText) {
+        await aiContextService.appendHistory({
+          conversationId: conversation.id,
+          newMessages: [
+            {
+              message: {
+                role: "assistant",
+                content: directSendTracker.sentText,
+              },
+              createdAt: Date.now(),
+            },
+          ],
+        })
+      }
+      return {
+        responded: true,
+        provider: provider as AIAgentProvider,
+        modelId: selectedModelId,
+        usedFallbackText: false,
+        toolStats: {
+          steps: stepCount,
+          toolCallsCount,
+          toolResultsCount,
+          toolErrorsCount,
+          toolNames: Array.from(toolNamesSet).slice(0, 10),
+          finishReasons: finishReasons.slice(0, 10),
+        },
+      }
+    }
 
     if (messageCount > 0 && fullText) {
       await aiContextService.appendHistory({
@@ -636,18 +705,6 @@ async function runAIReply(
       )
     }
   }
-}
-
-function appendToolOutputGuard(systemPrompt: string): string {
-  return `${systemPrompt}\n\n${helpTexts.toolOutputGuard}`.trim()
-}
-
-function appendHandoffPolicy(systemPrompt: string, tools: ToolSet): string {
-  if (!tools[systemFunctionNames.connectUserToHuman]) {
-    return systemPrompt
-  }
-
-  return `${systemPrompt}\n\n${aiPolicies.handoff}`.trim()
 }
 
 function appendUnavailableWebSearchPolicy(

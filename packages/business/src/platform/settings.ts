@@ -44,8 +44,8 @@ const getDefaultSettings = (): TenantSettings => {
     theme: null,
     customJS: null,
     customCSS: null,
-    policyUrl: `${derived.appUrl}/privacy-policy`,
-    termsOfServiceUrl: `${derived.appUrl}/terms-of-service`,
+    policyUrl: "https://chatbotx.io/privacy/",
+    termsOfServiceUrl: "https://chatbotx.io/terms/",
     signupEmailTemplate: null,
     forgotPasswordEmailTemplate: null,
     magicLinkEmailTemplate: null,
@@ -117,6 +117,23 @@ export const resolveTenantSettings = async (args: {
 export const resolveBroadcastSecret = (_args: {
   workspaceId: string
 }): string => integrationContextEnv().REALTIME_BROADCAST_SECRET
+
+/**
+ * Resolve tenant settings for a reseller/owner directly, without a request
+ * context. Used by out-of-band flows (e.g. provisioning a sub-account from an
+ * admin action) where there is no hostname or workspace to key off. Falls back
+ * to env defaults when the owner has no active tenant.
+ */
+export const resolveTenantSettingsByOwner = async (
+  ownerId: string,
+): Promise<TenantSettings> => {
+  const defaults = getDefaultSettings()
+  const tenant = await tenantService.findByOwner(ownerId)
+  if (!tenant?.status || tenant.status !== "active") {
+    return defaults
+  }
+  return applyTenantSetting(defaults, tenant)
+}
 
 /**
  * Resolve tenant settings by request hostname (from the `x-domain` header set by

@@ -1,18 +1,19 @@
-import crypto from "node:crypto"
 import type { ContextQueue, HandleRequestProps } from "@chatbotx.io/sdk"
 import z from "zod"
 import { MessengerWebhookException } from "../exception"
+import { hmacSha256Hex, timingSafeStringEqual } from "../lib/webhook"
 import {
+  incomingWebhookEventSchema,
   MESSENGER_MESSAGE_METADATA,
   type MessengerConfig,
-  messengerWebhookEventSchema,
+  messengerFeedCommentValueSchema,
 } from "../schema"
 
-const verifyWebhookSignature = (
+const verifyWebhookSignature = async (
   payload: string,
   signature: string,
   clientSecret: string,
-): boolean => {
+): Promise<boolean> => {
   try {
     const elements = signature.split("=")
     if (elements.length !== 2) {
@@ -20,13 +21,9 @@ const verifyWebhookSignature = (
     }
 
     const signatureHash = elements[1]
+    const expectedHash = await hmacSha256Hex(clientSecret, payload)
 
-    const expectedHash = crypto
-      .createHmac("sha256", clientSecret)
-      .update(payload)
-      .digest("hex")
-
-    return signatureHash === expectedHash
+    return timingSafeStringEqual(signatureHash, expectedHash)
   } catch {
     return false
   }
@@ -48,7 +45,7 @@ const handleWebhookEvent = async (
       throw new MessengerWebhookException("Missing webhook signature")
     }
 
-    const isValidSignature = verifyWebhookSignature(
+    const isValidSignature = await verifyWebhookSignature(
       body,
       signature,
       config.clientSecret,
@@ -58,7 +55,7 @@ const handleWebhookEvent = async (
       throw new MessengerWebhookException("Invalid webhook signature")
     }
 
-    const webhookData = messengerWebhookEventSchema.parse(JSON.parse(body))
+    const webhookData = incomingWebhookEventSchema.parse(JSON.parse(body))
     if (webhookData.object !== "page") {
       throw new MessengerWebhookException(
         `Unsupported webhook object type: ${webhookData.object}`,
@@ -68,7 +65,9 @@ const handleWebhookEvent = async (
 
     const entry = webhookData.entry[0]
 
-    const labelChange = entry.changes?.find((c) => c.field === "inbox_labels")
+    const labelChange = entry.changes?.find(
+      (c: { field: string }) => c.field === "inbox_labels",
+    )
     if (labelChange) {
       await queue?.add("channelLabelChange", {
         type: "channelLabelChange",
@@ -78,6 +77,57 @@ const handleWebhookEvent = async (
           payload: webhookData,
         },
       })
+      return
+    }
+
+    const feedChange = entry.changes?.find(
+      (c: { field: string }) => c.field === "feed",
+    )
+    if (feedChange) {
+      const parsed = messengerFeedCommentValueSchema.safeParse(feedChange.value)
+      if (parsed.success) {
+        const value = parsed.data
+        if (value.verb === "add" && value.from.id !== entry.id) {
+          // New comment from an external user — route to inbox
+          await queue?.add("incomingComment", {
+            type: "incomingComment",
+            data: {
+              integrationType: "messenger",
+              integrationIdentifier: entry.id,
+              commentData: {
+                commentId: value.comment_id,
+                postId: value.post_id,
+                parentId: value.parent_id,
+                fromId: value.from.id,
+                fromName: value.from.name,
+                message: value.message,
+                createdTime: value.created_time,
+              },
+            },
+          })
+        } else if (value.verb === "edited" && value.from.id !== entry.id) {
+          // Commenter edited their comment — sync the new text to the DB
+          await queue?.add("updateIncomingComment", {
+            type: "updateIncomingComment",
+            data: {
+              integrationType: "messenger",
+              integrationIdentifier: entry.id,
+              commentId: value.comment_id,
+              newText: value.message ?? "",
+            },
+          })
+        } else if (value.verb === "remove") {
+          // Commenter or page deleted the comment — soft-delete in the DB
+          await queue?.add("deleteIncomingComment", {
+            type: "deleteIncomingComment",
+            data: {
+              integrationType: "messenger",
+              integrationIdentifier: entry.id,
+              commentId: value.comment_id,
+            },
+          })
+        }
+      }
       return
     }
 

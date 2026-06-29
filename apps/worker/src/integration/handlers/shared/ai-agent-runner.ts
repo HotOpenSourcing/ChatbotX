@@ -7,6 +7,9 @@ import {
 import {
   aiContextService,
   aiIntegrationService,
+  appendFabricationGuard,
+  appendKnowledgeBaseGuard,
+  appendToolOutputGuard,
   createAIModelInstance,
   getAIToolset,
   McpClient,
@@ -24,7 +27,6 @@ import type {
 import { contactVariableService } from "@chatbotx.io/variables"
 import { type ModelMessage, stepCountIs, streamText, type ToolSet } from "ai"
 import { logger } from "../../../lib/logger"
-import { sendMessageWithRender } from "../../utils/message"
 
 export type ReplyByAIProps = {
   conversation: ConversationModel
@@ -149,7 +151,10 @@ async function runAIReplyInternal(
       ? `Conversation Context: ${props.summary}\n\n${promptBase}`
       : promptBase
 
-    const systemPrompt = appendToolOutputGuard(completePrompt)
+    const systemPrompt = appendKnowledgeBaseGuard(
+      appendFabricationGuard(appendToolOutputGuard(completePrompt), tools),
+      tools,
+    )
 
     const toolNamesSet = new Set<string>()
     const finishReasons: Array<{
@@ -162,6 +167,7 @@ async function runAIReplyInternal(
     let toolResultsCount = 0
     let toolErrorsCount = 0
 
+    const hasTools = Object.keys(tools).length > 0
     const result = await streamText({
       model,
       system: systemPrompt,
@@ -169,7 +175,7 @@ async function runAIReplyInternal(
       maxOutputTokens: aiAgent.maxOutputTokens,
       temperature: aiAgent.temperature,
       tools,
-      toolChoice: Object.keys(tools).length > 0 ? "auto" : "none",
+      toolChoice: hasTools ? "auto" : "none",
       stopWhen: stepCountIs(5),
       timeout: {
         totalMs: aiTimeouts.aiTotal,
@@ -233,14 +239,12 @@ async function runAIReplyInternal(
       abortSignal,
     })
 
-    const { messageCount, fullText } = await processStreamingText(
+    const { fullText } = await processStreamingText(
       result.textStream,
-      async (_segment, parts) => {
-        for (const part of parts) {
-          await sendMessageWithRender(conversation.id, part)
-        }
+      async () => {
+        // noop: fullText is accumulated internally, no message to send
       },
-      { sendParts: true },
+      { sendParts: false },
     ).catch((streamError) => {
       logger.error(
         {
@@ -251,10 +255,10 @@ async function runAIReplyInternal(
         },
         "[ai-agent-runner] processStreamingText threw error",
       )
-      return { messageCount: 0, fullText: "" }
+      return { fullText: "" }
     })
 
-    if (messageCount > 0 && fullText) {
+    if (fullText) {
       await aiContextService.appendHistory({
         conversationId: conversation.id,
         newMessages: [
@@ -286,7 +290,6 @@ async function runAIReplyInternal(
     }
 
     if (toolCallsCount > 0 || toolResultsCount > 0) {
-      await sendMessageWithRender(conversation.id, helpTexts.fallbackLookup)
       return {
         responded: true,
         provider: provider as AIAgentProvider,
@@ -317,10 +320,6 @@ async function runAIReplyInternal(
     )
     return null
   }
-}
-
-function appendToolOutputGuard(systemPrompt: string): string {
-  return `${systemPrompt}\n\n${helpTexts.toolOutputGuard}`.trim()
 }
 
 function hasToolResultError(value: unknown): boolean {

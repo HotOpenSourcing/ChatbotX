@@ -30,6 +30,7 @@ import {
   emitConversationUnassigned,
 } from "@chatbotx.io/events"
 import { withCache } from "@chatbotx.io/redis"
+import { createId } from "@chatbotx.io/utils"
 import { BaseService } from "../base.service"
 import { notFoundException } from "../errors"
 
@@ -106,6 +107,23 @@ class ConversationService extends BaseService {
     })
   }
 
+  async findDMByContact(props: {
+    workspaceId: string
+    contactId: string
+    tx?: DatabaseClient
+  }): Promise<ConversationModel | undefined> {
+    const { tx = db, workspaceId, contactId } = props
+    // Read receipts always target the DM conversation (sourceId IS NULL). Only
+    // TikTok and Facebook comment conversations have a non-null sourceId.
+    return await tx.query.conversationModel.findFirst({
+      where: {
+        workspaceId,
+        contactId,
+        sourceId: { isNull: true },
+      },
+    })
+  }
+
   async findByContactWithInboxes(props: {
     contactId: string
     workspaceId: string
@@ -152,7 +170,9 @@ class ConversationService extends BaseService {
 
   async findManyQuery<W extends ConversationWithConfig>(props: {
     where: Record<string, unknown>
-    orderBy?: Record<string, unknown>
+    orderBy?: NonNullable<
+      Parameters<typeof db.query.conversationModel.findMany>[0]
+    >["orderBy"]
     limit?: number
     with?: W
     tx?: DatabaseClient
@@ -244,6 +264,36 @@ class ConversationService extends BaseService {
   }
 
   // ─── Writes ──────────────────────────────────────────────────────────────
+
+  async findOrCreate(props: {
+    workspaceId: string
+    contactId: string
+    sourceId: string | null
+    tx?: DatabaseClient
+  }): Promise<ConversationModel> {
+    const { workspaceId, contactId, sourceId, tx = db } = props
+
+    const existing = await tx.query.conversationModel.findFirst({
+      where: {
+        workspaceId,
+        contactId,
+        sourceId: sourceId === null ? { isNull: true } : sourceId,
+      },
+    })
+    if (existing) {
+      return existing
+    }
+
+    const created = await tx
+      .insert(conversationModel)
+      .values({ id: createId(), workspaceId, contactId, sourceId })
+      .returning()
+      .then((result) => result[0])
+    if (!created) {
+      throw new Error("Conversation not found")
+    }
+    return created
+  }
 
   async updateArchived(props: {
     workspaceId: string

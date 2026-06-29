@@ -56,6 +56,11 @@ import { getUserData } from "./get-user-data"
 import { syncKlaviyoProfile } from "./klaviyo-handler"
 import { addMailchimpMember } from "./mailchimp-handler"
 import { addMailerLiteSubscriber } from "./mailer-lite-handler"
+import {
+  disableMessengerComposer,
+  enableMessengerComposer,
+  setMessengerUserPersistentMenu,
+} from "./messenger-user-menu"
 import { addOrUpdateMoosendContact } from "./moosend-handler"
 import { sendEmail } from "./send-email"
 import { addSendGridContact } from "./sendgrid-handler"
@@ -114,6 +119,7 @@ async function splitTraffic({
   targetId,
   useLatestFlowVersion,
   sendFrom,
+  nodeVisits,
 }: ExecuteStepProps<SplitTrafficStepSchema>) {
   if (!(targetId && step.cases.length)) {
     return
@@ -145,6 +151,7 @@ async function splitTraffic({
         flowVersionId: useLatestFlowVersion ? undefined : flowVersion.id,
         nodeId: connectedEdge.target,
         sendFrom,
+        nodeVisits,
       },
     })
   }
@@ -268,6 +275,7 @@ async function startAnotherNode(
       nodeId: props.step.nodeId,
       metadata: props.metadata,
       sendFrom: props.sendFrom,
+      nodeVisits: props.nodeVisits,
     },
   })
 }
@@ -278,6 +286,7 @@ async function startExternalFlow({
   step,
   metadata,
   sendFrom,
+  nodeVisits,
 }: ExecuteStepProps<StartExternalFlowStepSchema>) {
   await integrationQueue.add(IntegrationJobAction.sendFlow, {
     type: IntegrationJobAction.sendFlow,
@@ -287,6 +296,7 @@ async function startExternalFlow({
       flowId: step.flowId,
       metadata,
       sendFrom,
+      nodeVisits,
     },
   })
 }
@@ -297,6 +307,7 @@ async function startExternalNode({
   step,
   metadata,
   sendFrom,
+  nodeVisits,
 }: ExecuteStepProps<StartExternalNodeStepSchema>) {
   await integrationQueue.add(IntegrationJobAction.sendFlow, {
     type: IntegrationJobAction.sendFlow,
@@ -307,6 +318,7 @@ async function startExternalNode({
       nodeId: step.nodeId,
       metadata,
       sendFrom,
+      nodeVisits,
     },
   })
 }
@@ -419,4 +431,8 @@ export const flowStepHandlers: Record<
   [stepTypes.enum.sendMessengerTemplateMessage]: sendFlowMessage,
   [stepTypes.enum.whatsappOptionList]: sendFlowMessage,
   [stepTypes.enum.whatsappFlow]: sendFlowMessage,
+  [stepTypes.enum.setMessengerUserPersistentMenu]:
+    setMessengerUserPersistentMenu,
+  [stepTypes.enum.enableMessengerComposer]: enableMessengerComposer,
+  [stepTypes.enum.disableMessengerComposer]: disableMessengerComposer,
 }

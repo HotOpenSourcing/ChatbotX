@@ -37,6 +37,7 @@
     "disconnect": "Ngắt kết nối",
     "download": "Tải xuống",
     "edit": "Chỉnh sửa",
+    "editFeature": "Chỉnh sửa {feature}",
     "enableBot": "Bật bot",
     "export": "Xuất",
     "getEmbedCode": "Lấy mã nhúng",
@@ -71,6 +72,8 @@
     "toggleTheme": "Chuyển đổi giao diện",
     "transferConversationToBot": "Chuyển cuộc trò chuyện cho bot",
     "update": "Cập nhật",
+    "updatePayment": "Cập nhật thanh toán",
+    "upgradePlan": "Nâng cấp gói",
     "upgradeToPro": "Nâng cấp lên Pro",
     "uploadFile": "Tải lên tệp",
     "view": "Xem",
@@ -227,7 +230,39 @@
     }
   },
   "billing": {
-    "title": "Thanh toán"
+    "title": "Thanh toán",
+    "plan": {
+      "label": "Gói: {plan}",
+      "free": "Miễn phí"
+    },
+    "usage": {
+      "contacts": "Liên hệ",
+      "mac": "Liên hệ hoạt động hằng tháng",
+      "workspaces": "Không gian làm việc",
+      "channels": "Kênh",
+      "teamMembers": "Thành viên nhóm"
+    },
+    "limitReached": {
+      "workspaces": "Bạn đã đạt giới hạn không gian làm việc. Nâng cấp gói để tạo thêm.",
+      "channels": "Bạn đã đạt giới hạn kênh. Nâng cấp gói để kết nối thêm.",
+      "teamMembers": "Bạn đã đạt giới hạn thành viên nhóm. Nâng cấp gói để mời thêm.",
+      "contacts": "Bạn đã đạt giới hạn liên hệ. Nâng cấp gói để thêm liên hệ.",
+      "mac": "Bạn đã đạt giới hạn liên hệ hoạt động hằng tháng. Nâng cấp gói để tiếp cận thêm."
+    },
+    "pastDue": {
+      "message": "Thanh toán gần nhất của bạn không thành công. Cập nhật phương thức thanh toán để tiếp tục sử dụng workspace."
+    },
+    "trial": {
+      "daysLeft": "Dùng thử: còn {days} ngày",
+      "endsTomorrow": "Dùng thử kết thúc vào ngày mai",
+      "expired": "Bản dùng thử đã kết thúc — nâng cấp để tiếp tục sử dụng workspace",
+      "dismiss": "Đóng"
+    },
+    "trialExpired": {
+      "title": "Bản dùng thử của bạn đã kết thúc",
+      "description": "Đăng ký một gói để tiếp tục sử dụng workspace của bạn.",
+      "cta": "Xem các gói"
+    }
   },
   "broadcasts": {
     "title": "Phát sóng",
@@ -884,6 +919,10 @@
         "sendFlow": "Gửi luồng"
       }
     },
+    "userPersistentMenu": {
+      "pageDefault": "Mặc định",
+      "label": "Menu cố định người dùng"
+    },
     "phoneNumber": {
       "label": "Số điện thoại"
     },
@@ -1175,6 +1214,9 @@
     },
     "outputFieldId": {
       "label": "Lưu kết quả vào trường tùy chỉnh"
+    },
+    "audio": {
+      "label": "Trường âm thanh"
     },
     "voiceType": {
       "label": "Kiểu giọng nói",
@@ -1498,11 +1540,15 @@
       "dripSubscribeSubscriber": "Thêm liên hệ vào Drip",
       "getResponseAddContact": "Thêm liên hệ vào GetResponse",
       "sendGridAddContact": "Thêm liên hệ vào SendGrid",
+      "messenger": "Messenger",
       "openWebsite": "Mở trang web",
       "optInEmail": "Đăng ký nhận email",
       "optOutEmail": "Hủy đăng ký email",
       "performAction": "Thực hiện hành động",
       "removeContactTag": "Xóa thẻ liên hệ",
+      "setMessengerUserPersistentMenu": "Thiết lập menu cố định người dùng",
+      "enableMessengerComposer": "Bật ô nhập tin nhắn Messenger",
+      "disableMessengerComposer": "Tắt ô nhập tin nhắn Messenger",
       "sendAudio": "Gửi âm thanh",
       "sendCard": "Gửi thẻ",
       "sendExternalFlow": "Gửi luồng bên ngoài",
@@ -1927,6 +1973,12 @@
       "tiktokAppSecretRequired": "App Secret là bắt buộc để cấu hình TikTok."
     }
   },
+  "home": {
+    "welcomeBack": "Chào mừng trở lại, {name}",
+    "subtitle": "Chọn một không gian làm việc để tiếp tục, hoặc tạo mới.",
+    "noWorkspaces": "Bạn chưa có không gian làm việc nào.",
+    "owner": "Chủ sở hữu"
+  },
   "messages": {
     "moveFeature": "Di chuyển {feature}",
     "poweredBy": "Được cung cấp bởi {name}",
@@ -1945,6 +1997,21 @@
     "disconnectFeature": "Ngắt kết nối {feature}",
     "disconnectFeatureDescription": "Bạn có chắc chắn muốn ngắt kết nối {feature}?",
     "disconnectSuccess": "Đã ngắt kết nối {feature} thành công",
+    "reply": "Trả lời",
+    "viewMessage": "Xem tin nhắn",
+    "changeLikeState": "Thay đổi trạng thái thích",
+    "changeHideState": "Thay đổi trạng thái ẩn",
+    "commentHidden": "Bình luận này đã bị ẩn",
+    "messageDeleted": "Tin nhắn này đã bị xoá.",
+    "deleteComment": "Xóa bình luận",
+    "deleteCommentConfirmation": "Bạn có chắc muốn xóa bình luận này? Các bình luận trả lời cũng sẽ bị xóa, cả trong hộp thư và trên Facebook. Hành động này không thể hoàn tác.",
+    "deleteMessageSuccess": "Đã xóa tin nhắn",
+    "facebookComment": "Bình luận Facebook",
+    "editComment": "Sửa bình luận",
+    "editMessageSuccess": "Đã cập nhật tin nhắn",
+    "editMessagePlaceholder": "Sửa tin nhắn của bạn...",
+    "saveEdit": "Lưu",
+    "cancelEdit": "Hủy",
     "failedToCopy": "Sao chép thất bại",
     "failedToPreviewImage": "Không thể xem trước hình ảnh",
     "loadingData": "Đang tải dữ liệu...",
@@ -1952,6 +2019,7 @@
     "leaveEmptyToKeepSecret": "Để trống để giữ nguyên secret hiện tại",
     "needToAddSettings": "Bạn cần thêm cài đặt để sử dụng tích hợp này",
     "noDataAvailable": "Không có dữ liệu",
+    "noResults": "Không có kết quả.",
     "savedSuccessfully": "Đã lưu thành công",
     "nameAlreadyExists": "Tên {feature} đã tồn tại",
     "unknownError": "Lỗi không xác định",
@@ -1979,6 +2047,7 @@
     "changeDefaultDescription": "Bạn có chắc chắn muốn thay đổi AI agent mặc định?",
     "unsetDefaultDescription": "Bạn có chắc chắn muốn bỏ đặt AI agent mặc định?",
     "botIsActive": "Bot đang hoạt động",
+    "viewPost": "Xem bài viết",
     "selectConversationTitle": "Chọn một cuộc trò chuyện",
     "selectConversationDescription": "Chọn một cuộc trò chuyện từ danh sách bên trái để xem tin nhắn và bắt đầu trò chuyện.",
     "selectConversationContactTitle": "Chưa chọn liên hệ",
@@ -2000,6 +2069,11 @@
     "featureNotFound": "Không tìm thấy {feature}",
     "enableSuccess": "Đã bật {feature} thành công",
     "userInactive": "Người dùng không hoạt động hơn 7 ngày",
+    "messagingWindowClosed": "Không thể gửi tin nhắn ngoài cửa sổ thời gian cho phép",
+    "sendHumanAgentTag": "Gửi một tin nhắn với thẻ HUMAN_AGENT",
+    "warning": "Warning!",
+    "humanAgentWarningDescription": "Bạn chỉ có thể trả lời tin nhắn của người dùng trong vòng 7 ngày khi vấn đề không thể giải quyết trong vòng 24 giờ. Ví dụ: cuối tuần, ngày lễ, hoặc các trường hợp cần hơn một ngày để xử lý. Không sử dụng tùy chọn này cho bất kỳ lý do nào khác vì có thể ảnh hưởng đến Trang Facebook hoặc tài khoản Instagram của bạn. Nếu bạn không chắc chắn, đừng tiếp tục.",
+    "humanAgentWindowExpired": "Cửa sổ nhắn tin đã hết hạn. Liên hệ phải nhắn tin trước để mở lại cuộc trò chuyện.",
     "restoreVersionSuccess": "Đã khôi phục luồng về phiên bản đã chọn",
     "noVersionsFound": "Không tìm thấy phiên bản đã xuất bản",
     "publishVersionSuccess": "Đã xuất bản phiên bản mới",
@@ -2143,6 +2217,17 @@
       "label": "DeepSeek"
     },
     "title": "DeepSeek"
+  },
+  "openrouter": {
+    "autoReply": {
+      "description": "Bật AI tự động trả lời được hỗ trợ bởi OpenRouter.",
+      "label": "AI tự động trả lời"
+    },
+    "connect": {
+      "description": "Truy cập hơn 300 mô hình AI bằng một API key.",
+      "label": "OpenRouter"
+    },
+    "title": "OpenRouter"
   },
   "settings": {
     "title": "Cài đặt",
@@ -2549,6 +2634,9 @@
   "triggers": {
     "title": "Kích hoạt"
   },
+  "userPersistentMenus": {
+    "title": "Menu cố định người dùng"
+  },
   "webhooks": {
     "title": "Webhooks"
   },
@@ -2662,7 +2750,8 @@
     "openai": "OpenAI",
     "gemini": "Gemini",
     "claude": "Claude",
-    "deepseek": "DeepSeek"
+    "deepseek": "DeepSeek",
+    "openrouter": "OpenRouter"
   },
   "smtp": {
     "setting": {
@@ -2797,6 +2886,7 @@
     "portalUsage": "Mức sử dụng",
     "portalCustomDomain": "Tên miền tùy chỉnh",
     "portalPaymentProcessor": "Cổng thanh toán",
+    "portalSmtp": "Cài đặt SMTP",
     "portalPricingPage": "Bảng giá"
   },
   "unsubscribePage": {

@@ -1,10 +1,14 @@
+import { createId } from "@chatbotx.io/utils"
+import { sql } from "drizzle-orm"
 import {
   index,
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
-  uniqueIndex,
+  timestamp,
+  unique,
 } from "drizzle-orm/pg-core"
 import {
   type ContentType,
@@ -14,7 +18,7 @@ import {
   type SenderType,
   senderTypes,
 } from "../partials"
-import { bigintAsString, sharedColumns } from "../partials/shared"
+import { bigintAsString, timestampConfig } from "../partials/shared"
 import { contactInboxModel } from "./contact-inbox"
 import { conversationModel } from "./conversation"
 import { workspaceModel } from "./workspace"
@@ -31,11 +35,16 @@ export const contentType = pgEnum(
   "contentType",
   contentTypes.options as [string, ...string[]],
 )
+export const messageKind = pgEnum("messageKind", ["message", "comment"])
 
 export const messageModel = pgTable(
   "Message",
   {
-    ...sharedColumns,
+    id: bigintAsString()
+      .notNull()
+      .$defaultFn(() => createId()),
+    createdAt: timestamp(timestampConfig).defaultNow().notNull(),
+    updatedAt: timestamp(timestampConfig).defaultNow().notNull(),
     conversationId: bigintAsString()
       .notNull()
       .references(() => conversationModel.id, {
@@ -63,29 +72,51 @@ export const messageModel = pgTable(
     senderType: senderType().$type<SenderType>().notNull(),
     senderId: bigintAsString(),
     sourceId: text(),
+    deletedAt: timestamp({ withTimezone: true }),
+    type: messageKind().notNull().default("message"),
+    parentId: text(),
+    attributes: jsonb().$type<{ liked: boolean; hidden: boolean }>(),
   },
   (table) => [
-    index("Message_workspaceId_idx").using(
+    primaryKey({ columns: [table.id, table.createdAt] }),
+    // TimescaleDB dedup fallback: unique constraint must include the partition key.
+    unique("Message_source_dedup_idx").on(
+      table.contactInboxId,
+      table.sourceId,
+      table.createdAt,
+    ),
+    index("Message_conversation_history_idx").using(
+      "btree",
+      table.conversationId.asc().nullsLast(),
+      table.createdAt.desc().nullsLast(),
+      table.id.desc().nullsLast(),
+    ),
+    index("Message_workspace_created_idx").using(
       "btree",
       table.workspaceId.asc().nullsLast(),
+      table.createdAt.desc().nullsLast(),
     ),
-    uniqueIndex("Message_contactInboxId_sourceId_key").using(
+    index("Message_contactInboxId_sourceId_createdAt_idx").using(
       "btree",
       table.contactInboxId.asc().nullsLast(),
       table.sourceId.asc().nullsLast(),
+      table.createdAt.desc().nullsLast(),
     ),
-    index("Message_conversationId_idx").using(
+    index("Message_conversationId_type_idx").using(
       "btree",
+      table.workspaceId.asc().nullsLast(),
       table.conversationId.asc().nullsLast(),
+      table.type.asc().nullsLast(),
+      table.createdAt.desc().nullsLast(),
     ),
-    index("Message_inboxId_idx").using(
-      "btree",
-      table.contactInboxId.asc().nullsLast(),
-    ),
-    index("Message_senderType_senderId_idx").using(
-      "btree",
-      table.senderType.asc().nullsLast(),
-      table.senderId.asc().nullsLast(),
-    ),
+    index("Message_parentId_idx")
+      .using(
+        "btree",
+        table.workspaceId.asc().nullsLast(),
+        table.parentId.asc().nullsLast(),
+        table.type.asc().nullsLast(),
+        table.createdAt.desc().nullsLast(),
+      )
+      .where(sql`"parentId" IS NOT NULL`),
   ],
 )

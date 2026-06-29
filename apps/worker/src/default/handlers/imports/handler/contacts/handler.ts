@@ -1,5 +1,5 @@
-import { userQuotaService, workspaceService } from "@chatbotx.io/business"
-import { db } from "@chatbotx.io/database/client"
+import { contactInboxService, workspaceService } from "@chatbotx.io/business"
+import { db, inArray } from "@chatbotx.io/database/client"
 import {
   type ContactImportMeta,
   type CustomFieldType,
@@ -14,7 +14,6 @@ import {
   conversationModel,
   type inboxModel,
 } from "@chatbotx.io/database/schema"
-import { distributedLock } from "@chatbotx.io/redis"
 import { createId } from "@chatbotx.io/utils"
 import { logger } from "../../../../../lib/logger"
 import type {
@@ -29,11 +28,11 @@ import { type ContactRow, extractRowData } from "./extractor"
 type ContactDeps = {
   customFieldTypes: Map<string, CustomFieldType>
   inbox: typeof inboxModel.$inferSelect
-  ownerId: string
 }
 
 type AcceptedContact = {
   contactId: string
+  contactInboxId: string
   row: ContactRow
 }
 
@@ -85,7 +84,7 @@ const prepareContacts = async ({
 
   return {
     ok: true,
-    deps: { customFieldTypes, inbox, ownerId: workspace.ownerId },
+    deps: { customFieldTypes, inbox },
   }
 }
 
@@ -119,113 +118,132 @@ const processContactRow = (
   return { ...mapped, customFields: safeCustomFields }
 }
 
-// C-1: Serialize quota check + insert + increment per owner via a distributed
-// lock so concurrent import jobs cannot both pass the remaining-slots gate and
-// together exceed the plan limit.
-const insertContactBatch = (
+// Import only creates contact records. MAC is counted later when a real
+// interaction occurs, so this path dedups and inserts all fresh eligible rows
+// without reserving quota.
+const insertContactBatch = async (
   deps: ContactDeps,
   eligible: ContactRow[],
   ctx: { row: ImportRow; meta: ContactImportMeta },
 ): Promise<number> => {
-  return distributedLock.runExclusive({
-    key: `contact-import-quota:${deps.ownerId}`,
-    timeoutInSeconds: 30,
-    fn: async () => {
-      const remaining = await userQuotaService.getRemainingSlots(
-        deps.ownerId,
-        "contacts",
-      )
-      if (remaining === 0) {
-        return 0
-      }
+  const externalIds = eligible.map((row) => row.externalId as string)
+  const latestExisting = await contactInboxService.findExistingSourceIds({
+    inboxId: ctx.row.inboxId,
+    sourceIds: externalIds,
+  })
 
-      const toInsert =
-        remaining === null ? eligible : eligible.slice(0, remaining)
-      const accepted: AcceptedContact[] = toInsert.map((row) => ({
-        contactId: createId(),
-        row,
-      }))
-      if (accepted.length === 0) {
-        return 0
-      }
+  const freshEligible = eligible.filter(
+    (row) => !latestExisting.has(row.externalId as string),
+  )
+  if (freshEligible.length === 0) {
+    return 0
+  }
 
-      await db.transaction(async (tx) => {
-        await tx.insert(contactModel).values(
-          accepted.map(({ contactId, row }) => ({
-            id: contactId,
-            workspaceId: ctx.row.workspaceId,
-            phoneNumber: row.phoneNumber,
-            email: row.email,
-            firstName: row.firstName,
-            lastName: row.lastName,
-          })),
-        )
+  const accepted: AcceptedContact[] = freshEligible.map((row) => ({
+    contactId: createId(),
+    contactInboxId: createId(),
+    row,
+  }))
+  if (accepted.length === 0) {
+    return 0
+  }
 
-        // H-2: Use onConflictDoNothing so a contact appearing in two separate
-        // 1 000-row batches does not roll back the entire second batch.
-        await tx
-          .insert(contactInboxModel)
-          .values(
-            accepted.map(({ contactId, row }) => {
-              // C-2: externalId is guaranteed non-null here by processContactBatch,
-              // but assert explicitly rather than casting to catch future regressions.
-              if (!row.externalId) {
-                throw new Error(
-                  "Invariant: externalId must be set before insert",
-                )
-              }
-              return {
-                id: createId(),
-                originalContactId: contactId,
-                contactId,
-                inboxId: ctx.row.inboxId,
-                channel: deps.inbox.channel,
-                source: contactSources.enum.imported,
-                sourceId: row.externalId,
-              }
-            }),
-          )
-          .onConflictDoNothing()
+  return db.transaction(async (tx) => {
+    await tx.insert(contactModel).values(
+      accepted.map(({ contactId, row }) => ({
+        id: contactId,
+        workspaceId: ctx.row.workspaceId,
+        phoneNumber: row.phoneNumber,
+        email: row.email,
+        firstName: row.firstName,
+        lastName: row.lastName,
+      })),
+    )
 
-        await tx.insert(conversationModel).values(
-          accepted.map(({ contactId }) => ({
-            id: createId(),
-            workspaceId: ctx.row.workspaceId,
+    // A duplicate should already have been removed by the re-check, but a
+    // non-import path (e.g. a concurrent inbound message creating the same
+    // (inboxId, sourceId)) can still win the race in the window between
+    // that re-check and this insert. `onConflictDoNothing` skips those rows;
+    // we then continue with only the contacts whose link actually inserted,
+    // so a single late conflict can no longer fail the entire batch while
+    // still guaranteeing no contact is created without its inbox row.
+    const insertedContactInboxes = await tx
+      .insert(contactInboxModel)
+      .values(
+        accepted.map(({ contactId, contactInboxId, row }) => {
+          // C-2: externalId is guaranteed non-null here by processContactBatch,
+          // but assert explicitly rather than casting to catch future regressions.
+          if (!row.externalId) {
+            throw new Error("Invariant: externalId must be set before insert")
+          }
+          return {
+            id: contactInboxId,
+            originalContactId: contactId,
             contactId,
-          })),
-        )
-
-        const customFieldValues = accepted.flatMap(({ contactId, row }) =>
-          row.customFields.map((field) => ({
-            id: createId(),
-            contactId,
-            customFieldId: field.customFieldId,
-            value: field.value,
-          })),
-        )
-        if (customFieldValues.length) {
-          await tx.insert(contactCustomFieldModel).values(customFieldValues)
-        }
-
-        if (ctx.meta.tagId) {
-          const tagId = ctx.meta.tagId
-          await tx
-            .insert(contactsToTagsModel)
-            .values(accepted.map(({ contactId }) => ({ contactId, tagId })))
-            .onConflictDoNothing()
-        }
-      })
-
-      // H-1: Increment inside the lock so the live Redis counter is updated
-      // before another concurrent import reads it.
-      await userQuotaService.incrementBy(
-        deps.ownerId,
-        "contacts",
-        accepted.length,
+            inboxId: ctx.row.inboxId,
+            channel: deps.inbox.channel,
+            source: contactSources.enum.imported,
+            sourceId: row.externalId,
+          }
+        }),
       )
+      .onConflictDoNothing()
+      .returning({ contactId: contactInboxModel.contactId })
 
-      return accepted.length
-    },
+    const insertedContactIds = new Set(
+      insertedContactInboxes.map((inboxRow) => inboxRow.contactId),
+    )
+    const survivors = accepted.filter(({ contactId }) =>
+      insertedContactIds.has(contactId),
+    )
+
+    // Prune the orphan Contact rows whose link lost the conflict so we never
+    // leave a contact without a channel row (cascades clean up any partial
+    // children).
+    if (survivors.length !== accepted.length) {
+      const orphanIds = accepted
+        .filter(({ contactId }) => !insertedContactIds.has(contactId))
+        .map(({ contactId }) => contactId)
+      await tx.delete(contactModel).where(inArray(contactModel.id, orphanIds))
+      logger.warn(
+        { inboxId: ctx.row.inboxId, conflicts: orphanIds.length },
+        "Import contact source conflict: skipped already-linked contacts",
+      )
+    }
+
+    if (survivors.length === 0) {
+      return 0
+    }
+
+    await tx.insert(conversationModel).values(
+      survivors.map(({ contactId }) => ({
+        id: createId(),
+        workspaceId: ctx.row.workspaceId,
+        contactId,
+      })),
+    )
+
+    const customFieldValues = survivors.flatMap(({ contactId, row }) =>
+      row.customFields.map((field) => ({
+        id: createId(),
+        contactId,
+        customFieldId: field.customFieldId,
+        value: field.value,
+      })),
+    )
+    if (customFieldValues.length) {
+      await tx.insert(contactCustomFieldModel).values(customFieldValues)
+    }
+
+    if (ctx.meta.tagId) {
+      const tagId = ctx.meta.tagId
+      await tx
+        .insert(contactsToTagsModel)
+        .values(survivors.map(({ contactId }) => ({ contactId, tagId })))
+        .onConflictDoNothing()
+    }
+
+    return survivors.length
   })
 }
 
@@ -253,12 +271,10 @@ const processContactBatch = async (
     }
 
     const externalIds = contacts.map((c) => c.externalId as string)
-    const existingRows = await db.query.contactInboxModel.findMany({
-      where: { inboxId: ctx.row.inboxId, sourceId: { in: externalIds } },
-      columns: { sourceId: true },
+    const existing = await contactInboxService.findExistingSourceIds({
+      inboxId: ctx.row.inboxId,
+      sourceIds: externalIds,
     })
-
-    const existing = new Set(existingRows.map((e) => e.sourceId))
 
     const eligible = contacts.filter(
       (row) => !existing.has(row.externalId as string),

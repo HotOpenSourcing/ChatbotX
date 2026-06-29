@@ -23,9 +23,11 @@ import { countCharactersStep } from "./count-characters"
 import type { StepDefinition } from "./definition"
 import { deleteContactStep } from "./delete-contact"
 import { disableBotStep } from "./disable-bot"
+import { disableMessengerComposerStep } from "./disable-messenger-composer"
 import { dripSubscribeSubscriberStep } from "./drip-subscribe-subscriber"
 import emailStep from "./email"
 import { enableBotStep } from "./enable-bot"
+import { enableMessengerComposerStep } from "./enable-messenger-composer"
 import { followConversationStep } from "./follow-conversation"
 import { formatDateStep } from "./format-date"
 import { generateCodeStep } from "./generate-code"
@@ -52,6 +54,7 @@ import { sendVideoStep } from "./send-video"
 import sendWaTemplateMessageStep from "./send-wa-template-message"
 import { sendGridAddContactStep } from "./sendgrid-add-contact"
 import { setCustomFieldStep } from "./set-custom-field"
+import { setMessengerUserPersistentMenuStep } from "./set-messenger-user-persistent-menu"
 import { splitTrafficStep } from "./split-traffic"
 import { spreadsheetClearRowStep } from "./spreadsheet-clear-row"
 import { spreadsheetGetRandomRowStep } from "./spreadsheet-get-random-row"
@@ -158,6 +161,10 @@ export const allSteps: Record<StepType, StepDefinition<any> | undefined> = {
   [stepTypes.enum.typing]: typingStep,
   [stepTypes.enum.whatsappOptionList]: whatsappOptionListStep,
   [stepTypes.enum.whatsappFlow]: whatsappFlowStep,
+  [stepTypes.enum.setMessengerUserPersistentMenu]:
+    setMessengerUserPersistentMenuStep,
+  [stepTypes.enum.enableMessengerComposer]: enableMessengerComposerStep,
+  [stepTypes.enum.disableMessengerComposer]: disableMessengerComposerStep,
 }
 
 export const DynamicStepEditor = memo(

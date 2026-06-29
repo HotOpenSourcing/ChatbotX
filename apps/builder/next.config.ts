@@ -57,11 +57,11 @@ const nextConfig: NextConfig = {
           destination: `${s3Endpoint}/${s3Bucket}/:path*`,
         },
         { source: "/portal/:path*", destination: `${portalUrl}/portal/:path*` },
-        { source: "/pricing", destination: `${portalUrl}/portal/pricing` },
-        {
-          source: "/checkout/:path*",
-          destination: `${portalUrl}/portal/checkout/:path*`,
-        },
+        // { source: "/pricing", destination: `${portalUrl}/portal/pricing` },
+        // {
+        //   source: "/checkout/:path*",
+        //   destination: `${portalUrl}/portal/checkout/:path*`,
+        // },
         {
           source: "/api/checkout/:path*",
           destination: `${portalUrl}/portal/api/checkout/:path*`,
@@ -69,6 +69,13 @@ const nextConfig: NextConfig = {
         {
           source: "/api/billing/webhook",
           destination: `${portalUrl}/portal/api/billing/webhook`,
+        },
+        {
+          // Stripe Connect OAuth redirects the reseller's browser back to this
+          // builder-origin path (see portal connect/authorize redirect_uri);
+          // forward it to the portal handler so the token exchange can run.
+          source: "/api/billing/connect/:path*",
+          destination: `${portalUrl}/portal/api/billing/connect/:path*`,
         },
       ],
     }

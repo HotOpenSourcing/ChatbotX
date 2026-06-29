@@ -37,6 +37,7 @@
     "disconnect": "Disconnect",
     "download": "Download",
     "edit": "Edit",
+    "editFeature": "Edit {feature}",
     "enableBot": "Enable Bot",
     "export": "Export",
     "getEmbedCode": "Get Embed Code",
@@ -71,6 +72,8 @@
     "toggleTheme": "Toggle theme",
     "transferConversationToBot": "Transfer Conversation to Bot",
     "update": "Update",
+    "updatePayment": "Update payment",
+    "upgradePlan": "Upgrade plan",
     "upgradeToPro": "Upgrade to Pro",
     "uploadFile": "Upload File",
     "view": "View",
@@ -227,7 +230,39 @@
     }
   },
   "billing": {
-    "title": "Billing"
+    "title": "Billing",
+    "plan": {
+      "label": "Plan: {plan}",
+      "free": "Free"
+    },
+    "usage": {
+      "contacts": "Contacts",
+      "mac": "Monthly active contacts",
+      "workspaces": "Workspaces",
+      "channels": "Channels",
+      "teamMembers": "Team members"
+    },
+    "limitReached": {
+      "workspaces": "You've reached your workspace limit. Upgrade your plan to create more.",
+      "channels": "You've reached your channel limit. Upgrade your plan to connect more.",
+      "teamMembers": "You've reached your team member limit. Upgrade your plan to invite more.",
+      "contacts": "You've reached your contact limit. Upgrade your plan to add more.",
+      "mac": "You've reached your monthly active contact limit. Upgrade your plan to reach more."
+    },
+    "pastDue": {
+      "message": "Your last payment failed. Update your payment method to keep your workspace active."
+    },
+    "trial": {
+      "daysLeft": "Trial: {days} days left",
+      "endsTomorrow": "Trial ends tomorrow",
+      "expired": "Your trial has ended — upgrade to keep your workspace active",
+      "dismiss": "Dismiss"
+    },
+    "trialExpired": {
+      "title": "Your free trial has ended",
+      "description": "Subscribe to a plan to keep using your workspaces.",
+      "cta": "View plans"
+    }
   },
   "broadcasts": {
     "title": "Broadcasts",
@@ -895,6 +930,10 @@
         "sendFlow": "Send Flow"
       }
     },
+    "userPersistentMenu": {
+      "pageDefault": "Default",
+      "label": "User Persistent Menu"
+    },
     "phoneNumber": {
       "label": "Phone number"
     },
@@ -1196,6 +1235,9 @@
     "outputFieldId": {
       "label": "Save result to a custom field"
     },
+    "audio": {
+      "label": "Audio Field"
+    },
     "voiceType": {
       "label": "Voice Type",
       "placeholder": "Select a voice type"
@@ -1240,6 +1282,9 @@
     },
     "newPassword": {
       "label": "New Password"
+    },
+    "currentPassword": {
+      "label": "Current Password"
     },
     "developerAccessToken": {
       "label": "API Access Token"
@@ -1487,11 +1532,15 @@
       "dripSubscribeSubscriber": "Add Contact to Drip",
       "getResponseAddContact": "Add Contact to GetResponse",
       "sendGridAddContact": "Add Contact to SendGrid",
+      "messenger": "Messenger",
       "openWebsite": "Open Website",
       "optInEmail": "Opt In Email",
       "optOutEmail": "Opt Out Email",
       "performAction": "Perform Action",
       "removeContactTag": "Remove Contact Tag",
+      "setMessengerUserPersistentMenu": "Set User Persistent Menu",
+      "enableMessengerComposer": "Enable Messenger Composer",
+      "disableMessengerComposer": "Disable Messenger Composer",
       "sendAudio": "Send Audio",
       "sendCard": "Send Card",
       "sendExternalFlow": "Start External Flow",
@@ -1916,6 +1965,12 @@
       "tiktokAppSecretRequired": "App Secret is required to configure TikTok."
     }
   },
+  "home": {
+    "welcomeBack": "Welcome back, {name}",
+    "subtitle": "Pick a workspace to jump back in, or create a new one.",
+    "noWorkspaces": "You don't have any workspaces yet.",
+    "owner": "Owner"
+  },
   "messages": {
     "moveFeature": "Move {feature}",
     "poweredBy": "Powered by {name}",
@@ -1934,6 +1989,21 @@
     "disconnectFeature": "Disconnect {feature}",
     "disconnectFeatureDescription": "Are you sure you want to disconnect the {feature}?",
     "disconnectSuccess": "{feature} disconnected successfully",
+    "reply": "Reply",
+    "viewMessage": "View message",
+    "changeLikeState": "Change like state",
+    "changeHideState": "Change hide state",
+    "commentHidden": "This comment was hidden",
+    "messageDeleted": "The message has been deleted.",
+    "deleteComment": "Delete comment",
+    "deleteCommentConfirmation": "Are you sure you want to delete this comment? Its replies will also be deleted, both in your inbox and on Facebook. This action cannot be undone.",
+    "deleteMessageSuccess": "Message deleted",
+    "facebookComment": "Facebook comment",
+    "editComment": "Edit comment",
+    "editMessageSuccess": "Message updated",
+    "editMessagePlaceholder": "Edit your message...",
+    "saveEdit": "Save",
+    "cancelEdit": "Cancel",
     "failedToCopy": "Failed to copy",
     "failedToPreviewImage": "Failed to preview image",
     "loadingData": "Loading data...",
@@ -1941,6 +2011,7 @@
     "leaveEmptyToKeepSecret": "Leave empty to keep the current secret",
     "needToAddSettings": "You need to add settings to use this integration",
     "noDataAvailable": "No data available",
+    "noResults": "No results.",
     "savedSuccessfully": "Saved successfully",
     "syncedSuccessfully": "Synced successfully",
     "nameAlreadyExists": "{feature} name already exists",
@@ -1969,6 +2040,7 @@
     "changeDefaultDescription": "Are you sure you want to change the default AI agent?",
     "unsetDefaultDescription": "Are you sure you want to unset the default AI agent?",
     "botIsActive": "Bot is active",
+    "viewPost": "View post",
     "selectConversationTitle": "Select a conversation",
     "selectConversationDescription": "Choose a conversation from the list on the left to view messages and start chatting.",
     "selectConversationContactTitle": "No contact selected",
@@ -1989,6 +2061,11 @@
     "featureNotFound": "{feature} not found",
     "enableSuccess": "{feature} enabled successfully",
     "userInactive": "User has been inactive more than 7 days",
+    "messagingWindowClosed": "The message can not be send outside the allowed window",
+    "sendHumanAgentTag": "Send one message with HUMAN_AGENT tag",
+    "warning": "Warning!",
+    "humanAgentWarningDescription": "You may respond to a user's message within 7 days only when the issue cannot reasonably be resolved within 24 hours. Examples include weekends, holidays, or cases that require more than one day to complete. Do not use this option for any other reason, as it could put your Facebook Page or Instagram account at risk. If you're not sure, do not continue.",
+    "humanAgentWindowExpired": "Messaging window expired. The contact must message first to reopen the conversation.",
     "restoreVersionSuccess": "Flow restored to selected version",
     "noVersionsFound": "No published versions found",
     "publishVersionSuccess": "A new version has been published",
@@ -2132,6 +2209,17 @@
     },
     "title": "DeepSeek"
   },
+  "openrouter": {
+    "autoReply": {
+      "description": "Enable AI auto reply powered by OpenRouter.",
+      "label": "AI Auto Reply"
+    },
+    "connect": {
+      "description": "Access 300+ AI models through a single API key.",
+      "label": "OpenRouter"
+    },
+    "title": "OpenRouter"
+  },
   "settings": {
     "title": "Settings",
     "agents": {
@@ -2185,7 +2273,10 @@
     "passwordResetSuccess": "Password reset successfully",
     "resetPasswordTitle": "Reset your password",
     "resetPasswordDescription": "Enter your new password below.",
-    "signUpTitle": "Sign up to {name}"
+    "signUpTitle": "Sign up to {name}",
+    "changePasswordTitle": "Change your password",
+    "changePasswordDescription": "Set a new password before continuing.",
+    "passwordChangeSuccess": "Password changed"
   },
   "emailTopics": {
     "title": "Email Topics"
@@ -2463,6 +2554,9 @@
   "inboxTeams": {
     "title": "Inbox Teams"
   },
+  "userPersistentMenus": {
+    "title": "User Persistent Menus"
+  },
   "webhooks": {
     "title": "Webhooks"
   },
@@ -2663,7 +2757,8 @@
     "openai": "OpenAI",
     "gemini": "Gemini",
     "claude": "Claude",
-    "deepseek": "DeepSeek"
+    "deepseek": "DeepSeek",
+    "openrouter": "OpenRouter"
   },
   "smtp": {
     "setting": {
@@ -2794,6 +2889,7 @@
     "portalUsage": "Usage",
     "portalCustomDomain": "Custom Domain",
     "portalPaymentProcessor": "Payment Processor",
+    "portalSmtp": "SMTP Settings",
     "portalPricingPage": "Pricing"
   },
   "unsubscribePage": {

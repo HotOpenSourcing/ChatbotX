@@ -10,6 +10,12 @@ const updateSet = vi.fn()
 const updateWhere = vi.fn()
 const insertValues = vi.fn()
 const transactionFn = vi.fn()
+const deleteWhere = vi.fn()
+// `drop` = number of ContactInbox rows the simulated INSERT ... ON CONFLICT DO
+// NOTHING skips (i.e. lost a race to a concurrent insert). Default 0 = no
+// conflict. A mutable object so the hoisted mock factory closure observes
+// per-test updates.
+const conflict = { drop: 0 }
 
 vi.mock("@chatbotx.io/database/client", () => ({
   db: {
@@ -39,13 +45,39 @@ vi.mock("@chatbotx.io/database/client", () => ({
         insert: () => ({
           values: (v: unknown) => {
             insertValues(v)
-            return { onConflictDoNothing: () => undefined }
+            const rows = Array.isArray(v)
+              ? (v as Array<{ contactId?: string; sourceId?: string }>)
+              : [v as { contactId?: string; sourceId?: string }]
+            return {
+              onConflictDoNothing: () => ({
+                // Echo back the contactId of each inserted row so the handler can
+                // compute which contacts survived. ContactInbox rows carry a
+                // `sourceId`; drop `inboxConflictDrop` of them to simulate a
+                // concurrent-insert conflict.
+                returning: () => {
+                  const isContactInbox = rows.some(
+                    (r) => r && typeof r === "object" && "sourceId" in r,
+                  )
+                  const surviving =
+                    isContactInbox && conflict.drop > 0
+                      ? rows.slice(0, Math.max(0, rows.length - conflict.drop))
+                      : rows
+                  return surviving.map((item) => ({
+                    contactId: item.contactId,
+                  }))
+                },
+              }),
+            }
           },
+        }),
+        delete: () => ({
+          where: (cond: unknown) => deleteWhere(cond),
         }),
       })
     },
   },
   eq: (a: unknown, b: unknown) => ({ eq: [a, b] }),
+  inArray: (a: unknown, b: unknown) => ({ inArray: [a, b] }),
 }))
 
 vi.mock("@chatbotx.io/database/schema", () => ({
@@ -58,25 +90,17 @@ vi.mock("@chatbotx.io/database/schema", () => ({
 }))
 
 const workspaceFind = vi.fn()
-const getRemainingSlots = vi.fn()
-const incrementBy = vi.fn()
+// Returns the set of source ids already linked to the inbox. Per call so the
+// processBatch pre-check and the insert-time re-check can return different sets.
+const findExistingSourceIds = vi.fn(async () => new Set<string>())
 
 vi.mock("@chatbotx.io/business", () => ({
   workspaceService: {
     find: (...args: unknown[]) => workspaceFind(...args),
   },
-  userQuotaService: {
-    getRemainingSlots: (...args: unknown[]) => getRemainingSlots(...args),
-    incrementBy: (...args: unknown[]) => incrementBy(...args),
-  },
-}))
-
-// The contacts handler wraps quota reservation in distributedLock.runExclusive;
-// without a mock it opens a real Redis connection (ECONNREFUSED). Run the body
-// inline.
-vi.mock("@chatbotx.io/redis", () => ({
-  distributedLock: {
-    runExclusive: ({ fn }: { fn: () => Promise<unknown> }) => fn(),
+  contactInboxService: {
+    findExistingSourceIds: (...args: unknown[]) =>
+      findExistingSourceIds(...args),
   },
 }))
 
@@ -92,9 +116,12 @@ vi.mock("@chatbotx.io/filesystem", () => ({
 
 vi.mock("@chatbotx.io/utils", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@chatbotx.io/utils")>()
+  // Unique per call: each imported contact/inbox needs a distinct id so the
+  // survivor filter can tell rows apart when a conflict drops one.
+  let seq = 0
   return {
     ...actual,
-    createId: () => "generated-id",
+    createId: () => `generated-id-${seq++}`,
   }
 })
 
@@ -162,20 +189,20 @@ beforeEach(() => {
   findManyCustomFields.mockResolvedValue([])
   findManyContactInbox.mockReset()
   findManyContactInbox.mockResolvedValue([])
+  findExistingSourceIds.mockReset()
+  findExistingSourceIds.mockResolvedValue(new Set<string>())
   updateSet.mockReset()
   updateWhere.mockReset()
   insertValues.mockReset()
   transactionFn.mockReset()
+  deleteWhere.mockReset()
+  conflict.drop = 0
   getObjectStream.mockReset()
   headObject.mockReset()
   // Default: small file, passes the size check.
   headObject.mockResolvedValue({ ContentLength: 1024 })
   workspaceFind.mockReset()
   workspaceFind.mockResolvedValue({ id: "ws-1", ownerId: "owner-1" })
-  getRemainingSlots.mockReset()
-  getRemainingSlots.mockResolvedValue(100)
-  incrementBy.mockReset()
-  incrementBy.mockResolvedValue(undefined)
 })
 
 const runContactsImport = (row: unknown) =>
@@ -216,7 +243,6 @@ describe("contacts import pipeline", () => {
     })
     // One bulk transaction for the whole chunk, not one per row.
     expect(transactionFn).toHaveBeenCalledTimes(1)
-    expect(incrementBy).toHaveBeenCalledWith("owner-1", "contacts", 2)
   })
 
   test("counts blank row as failed but continues", async () => {
@@ -240,7 +266,7 @@ describe("contacts import pipeline", () => {
 
   test("skips a row that already exists in the inbox", async () => {
     findFirstInbox.mockResolvedValue({ id: "inbox-1", channel: "messenger" })
-    findManyContactInbox.mockResolvedValue([{ sourceId: "ext-1" }])
+    findExistingSourceIds.mockResolvedValue(new Set(["ext-1"]))
     getObjectStream.mockResolvedValue(
       streamOf([
         "external_id,phone,email",
@@ -258,9 +284,11 @@ describe("contacts import pipeline", () => {
     expect(transactionFn).not.toHaveBeenCalled()
   })
 
-  test("rejects rows that exceed the contact quota", async () => {
+  test("rechecks duplicates before insert", async () => {
     findFirstInbox.mockResolvedValue({ id: "inbox-1", channel: "messenger" })
-    getRemainingSlots.mockResolvedValue(0)
+    findExistingSourceIds
+      .mockResolvedValueOnce(new Set<string>())
+      .mockResolvedValueOnce(new Set(["ext-1"]))
     getObjectStream.mockResolvedValue(
       streamOf([
         "external_id,phone,email",
@@ -275,15 +303,13 @@ describe("contacts import pipeline", () => {
       successCount: 0,
       failedCount: 1,
     })
-    // Quota check runs before the transaction, so no transaction is opened.
     expect(transactionFn).not.toHaveBeenCalled()
-    expect(incrementBy).not.toHaveBeenCalled()
   })
 
-  test("inserts only up to the remaining quota and fails the overflow", async () => {
+  test("a late ContactInbox conflict skips only the conflicting row, not the whole batch", async () => {
     findFirstInbox.mockResolvedValue({ id: "inbox-1", channel: "messenger" })
-    // Room for one more contact only.
-    getRemainingSlots.mockResolvedValue(1)
+    // One of the two ContactInbox inserts loses a race to a concurrent insert.
+    conflict.drop = 1
     getObjectStream.mockResolvedValue(
       streamOf([
         "external_id,phone,email",
@@ -294,6 +320,8 @@ describe("contacts import pipeline", () => {
 
     await runContactsImport(buildRow())
 
+    // The batch completes (no abort): the surviving contact is counted, the
+    // conflicting one is reported failed, and its orphan Contact row is pruned.
     expect(lastUpdate()).toMatchObject({
       status: "completed",
       totalCount: 2,
@@ -301,7 +329,7 @@ describe("contacts import pipeline", () => {
       failedCount: 1,
     })
     expect(transactionFn).toHaveBeenCalledTimes(1)
-    expect(incrementBy).toHaveBeenCalledWith("owner-1", "contacts", 1)
+    expect(deleteWhere).toHaveBeenCalledTimes(1)
   })
 
   test("marks row failed when CSV is malformed", async () => {

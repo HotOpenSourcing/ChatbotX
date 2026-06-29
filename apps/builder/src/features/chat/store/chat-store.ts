@@ -7,6 +7,7 @@ import ky from "ky"
 import { createStore } from "zustand/vanilla"
 import type { ContactFilterRequest } from "@/features/contacts/schemas/contact-filter"
 import type { ContactResource } from "@/features/contacts/schemas/resource"
+import type { PostDetails } from "@/features/conversations/schema/query"
 import type {
   ConversationResource,
   ListConversationItemResource,
@@ -44,6 +45,12 @@ export type ChatState = {
   nextCursorMessage: string | null
   isLoadMoreMessage: boolean
   hasNextMessagePage: boolean
+
+  // message reply selection
+  replyToMessage: MessageResourceWithRelations | null
+
+  // active facebook post (for comment conversations)
+  activePost: PostDetails | null
 }
 
 export type ChatActions = {
@@ -71,14 +78,48 @@ export type ChatActions = {
 
   // Message actions
   appendMessage: (message: MessageResourceWithRelations) => void
+  markMessagesDeleted: (messageIds: string[]) => void
+  markMessagesRestored: (messageIds: string[]) => void
+  assignMessageCommentId: (messageId: string, commentId: string) => void
+  updateMessageAttributes: (
+    messageId: string,
+    attributes: { liked: boolean; hidden: boolean },
+  ) => void
+  updateMessageText: (
+    messageId: string,
+    newText: string,
+    attachmentUpdate?: {
+      newAttachmentPath: string | null
+      newAttachmentPublicUrl?: string | null
+      newAttachmentMimeType?: string | null
+      newAttachmentWidth?: number
+      newAttachmentHeight?: number
+      removedAttachment: boolean
+    },
+  ) => void
   loadMoreMessages: (workspaceId: string, perPage: number) => Promise<void>
   handleNewMessage: (message: MessageResourceWithRelations) => void
+  setReplyToMessage: (message: MessageResourceWithRelations | null) => void
+
+  // Post actions
+  loadActivePost: (workspaceId: string) => Promise<void>
 
   // Contact actions
   updateContact: (contactId: string, data: Partial<ContactResource>) => void
 }
 
 export type ChatStore = ChatState & ChatActions
+
+const appendUniqueConversations = (
+  current: ListConversationsResponse["data"],
+  incoming: ListConversationsResponse["data"],
+): ListConversationsResponse["data"] => {
+  const existingIds = new Set(current.map((conversation) => conversation.id))
+  return [
+    ...current,
+    ...incoming.filter((conversation) => !existingIds.has(conversation.id)),
+  ]
+}
 
 export const createChatStore = () => {
   return createStore<ChatStore>((set, get) => ({
@@ -96,10 +137,15 @@ export const createChatStore = () => {
     nextCursorMessage: null,
     isLoadMoreMessage: false,
     hasNextMessagePage: true,
+    replyToMessage: null,
+    activePost: null,
 
     prependConversation: (newConversation: ListConversationItemResource) =>
       set((state) => ({
-        conversations: [newConversation, ...state.conversations],
+        conversations: [
+          newConversation,
+          ...state.conversations.filter((c) => c.id !== newConversation.id),
+        ],
       })),
 
     loadMoreConversations: async (workspaceId: string) => {
@@ -153,7 +199,10 @@ export const createChatStore = () => {
       }
 
       set({
-        conversations: [...conversations, ...newConversations],
+        conversations: appendUniqueConversations(
+          conversations,
+          newConversations,
+        ),
         nextCursorConversation: nextCursor,
         isLoadingConversation: false,
         isFirstLoadConversation: false,
@@ -169,6 +218,8 @@ export const createChatStore = () => {
           nextCursorMessage: null,
           hasNextMessagePage: true,
           isLoadMoreMessage: false,
+          replyToMessage: null,
+          activePost: null,
         })
       }
     },
@@ -259,13 +310,118 @@ export const createChatStore = () => {
       }
     },
 
+    setReplyToMessage: (message) => set({ replyToMessage: message }),
+
     appendMessage: (message: MessageResourceWithRelations) => {
       const { updateConversationViaMessage } = get()
-      set((state) => ({
-        messages: [...state.messages, message],
-      }))
-
+      set((state) => {
+        if (state.messages.some((m) => m.id === message.id)) {
+          return state
+        }
+        const messageTime = new Date(message.createdAt).getTime()
+        const insertIndex = state.messages.findIndex(
+          (m) => new Date(m.createdAt).getTime() > messageTime,
+        )
+        if (insertIndex === -1) {
+          return { messages: [...state.messages, message] }
+        }
+        const messages = [...state.messages]
+        messages.splice(insertIndex, 0, message)
+        return { messages }
+      })
       updateConversationViaMessage(message)
+    },
+
+    updateMessageAttributes: (messageId, attributes) => {
+      set((state) => ({
+        messages: state.messages.map((message) =>
+          message.id === messageId ? { ...message, attributes } : message,
+        ),
+      }))
+    },
+
+    markMessagesDeleted: (messageIds: string[]) => {
+      const idSet = new Set(messageIds)
+      const now = new Date()
+      set((state) => ({
+        messages: state.messages.map((message) =>
+          idSet.has(message.id) ? { ...message, deletedAt: now } : message,
+        ),
+      }))
+    },
+
+    markMessagesRestored: (messageIds: string[]) => {
+      const idSet = new Set(messageIds)
+      set((state) => ({
+        messages: state.messages.map((message) =>
+          idSet.has(message.id) ? { ...message, deletedAt: null } : message,
+        ),
+      }))
+    },
+
+    assignMessageCommentId: (messageId, commentId) => {
+      set((state) => ({
+        messages: state.messages.map((message): typeof message =>
+          message.id === messageId
+            ? { ...message, sourceId: commentId }
+            : message,
+        ),
+      }))
+    },
+
+    updateMessageText: (messageId, newText, attachmentUpdate) => {
+      set((state) => ({
+        messages: state.messages.map((message): typeof message => {
+          if (message.id !== messageId) {
+            return message
+          }
+          const base = { ...message, text: newText }
+          if (!attachmentUpdate) {
+            return base
+          }
+          if (attachmentUpdate.removedAttachment) {
+            return { ...base, attachments: [] }
+          }
+          if (attachmentUpdate.newAttachmentPath) {
+            const mimeType =
+              attachmentUpdate.newAttachmentMimeType ??
+              "application/octet-stream"
+            let fileType: "image" | "video" | "audio" | "file" = "file"
+            if (mimeType.startsWith("image/")) {
+              fileType = "image"
+            } else if (mimeType.startsWith("video/")) {
+              fileType = "video"
+            } else if (mimeType.startsWith("audio/")) {
+              fileType = "audio"
+            }
+            return {
+              ...base,
+              attachments: [
+                {
+                  id: "pending",
+                  workspaceId: message.workspaceId,
+                  conversationId: message.conversationId,
+                  messageId: message.id,
+                  messageCreatedAt: message.createdAt,
+                  originPath: attachmentUpdate.newAttachmentPath,
+                  fileType,
+                  mimeType,
+                  url: attachmentUpdate.newAttachmentPublicUrl ?? null,
+                  name: null,
+                  size: 0,
+                  width: attachmentUpdate.newAttachmentWidth ?? null,
+                  height: attachmentUpdate.newAttachmentHeight ?? null,
+                  sourceId: null,
+                  thumbnailPath: null,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                },
+              ],
+            }
+          }
+          return base
+        }),
+      }))
     },
 
     loadMoreMessages: async (workspaceId: string, perPage: number) => {
@@ -381,9 +537,19 @@ export const createChatStore = () => {
 
       // Update last seen timestamps
       if (message.messageType === "incoming") {
+        const currentConversation = get().conversations.find(
+          (c) => c.id === message.conversationId,
+        )
+        const updatedContactInboxes = currentConversation?.contactInboxes?.map(
+          (ci, i) =>
+            i === 0 ? { ...ci, lastIncomingMessageAt: message.createdAt } : ci,
+        )
         updateConversation(message.conversationId, {
           contactRepliedAt: message.createdAt,
           contactLastReadAt: message.createdAt,
+          ...(updatedContactInboxes
+            ? { contactInboxes: updatedContactInboxes }
+            : {}),
         })
       }
       if (
@@ -426,6 +592,11 @@ export const createChatStore = () => {
           const newMessage = await ky
             .get<MessageResourceWithRelations>(
               `/api/workspaces/${message.workspaceId}/messages/${message.id}`,
+              {
+                searchParams: {
+                  createdAt: new Date(message.createdAt).toISOString(),
+                },
+              },
             )
             .json()
           appendMessage(newMessage)
@@ -433,6 +604,37 @@ export const createChatStore = () => {
       } else {
         // just append the messages to the end of messages list
         appendMessage(message)
+      }
+    },
+
+    loadActivePost: async (workspaceId: string) => {
+      const { conversations, activeConversationId } = get()
+      const conversation = conversations.find(
+        (c) => c.id === activeConversationId,
+      )
+      const contactInbox = conversation?.contactInboxes?.[0]
+
+      if (
+        !conversation?.sourceId ||
+        (contactInbox?.channel !== "messenger" &&
+          contactInbox?.channel !== "instagram") ||
+        !contactInbox?.inboxId
+      ) {
+        set({ activePost: null })
+        return
+      }
+
+      try {
+        const post =
+          await client.conversationsAPI.getPostDetailsAuthenticatedAPI({
+            workspaceId,
+            inboxId: contactInbox.inboxId,
+            postId: conversation.sourceId,
+            channel: contactInbox.channel,
+          })
+        set({ activePost: post })
+      } catch {
+        set({ activePost: null })
       }
     },
 

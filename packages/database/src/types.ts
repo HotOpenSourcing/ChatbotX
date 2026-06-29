@@ -36,6 +36,8 @@ export type IntegrationDeepseekModel =
   typeof schema.integrationDeepseekModel.$inferSelect
 export type IntegrationGeminiModel =
   typeof schema.integrationGeminiModel.$inferSelect
+export type IntegrationOpenrouterModel =
+  typeof schema.integrationOpenrouterModel.$inferSelect
 export type IntegrationGetResponseModel =
   typeof schema.integrationGetResponseModel.$inferSelect
 export type IntegrationModel = typeof schema.integrationModel.$inferSelect
@@ -150,3 +152,5 @@ export type ProductVariantOptionModel =
 export type ProductVariantModel = typeof schema.productVariantModel.$inferSelect
 export type ProductAddonModel = typeof schema.productAddonModel.$inferSelect
 export type WorkspaceMacModel = typeof schema.workspaceMacModel.$inferSelect
+export type ContactActiveHourlyModel =
+  typeof schema.contactActiveHourlyModel.$inferSelect

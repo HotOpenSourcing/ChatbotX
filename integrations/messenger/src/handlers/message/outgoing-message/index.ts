@@ -13,7 +13,10 @@ import {
   ChannelError,
   ChannelErrorCategory,
   contentTypes,
+  META_HUMAN_AGENT_WINDOW_MS,
+  META_RESPONSE_WINDOW_MS,
   type MessageHandlers,
+  normalizeLastIncomingMessageAt,
   type OutgoingContact,
   type OutgoingMessage,
   type SendFlowStepProps,
@@ -38,9 +41,6 @@ import { buildMessengerTemplateSendRequest } from "./send-messenger-template"
 import { convertFlowStepQuickReply } from "./send-quick-reply"
 import { convertFlowStepText } from "./send-text"
 
-const RESPONSE_WINDOW_MS = 24 * 60 * 60 * 1000
-const HUMAN_AGENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
-
 type MessengerMessagingPolicy = {
   messagingType: "MESSAGE_TAG" | "RESPONSE"
   tag?: FacebookSendMessageRequest["tag"]
@@ -53,6 +53,7 @@ export const sendMessage: MessageHandlers<MessengerAuthValue>["sendMessage"] =
       data: { contact, message, sendFrom },
     } = props
 
+    const messageIds: string[] = []
     try {
       const policy = resolveMessengerMessagingPolicy({ contact, sendFrom })
       for (const facebookMessage of convertMessageToFacebookMessage(message)) {
@@ -63,7 +64,10 @@ export const sendMessage: MessageHandlers<MessengerAuthValue>["sendMessage"] =
           personaId: (ctx.integrationDetail as MessengerIntegrationDetail)
             .personaId,
         })
-        await sendPageMessage(ctx.auth, payload)
+        const response = await sendPageMessage(ctx.auth, payload)
+        if (response.message_id) {
+          messageIds.push(response.message_id)
+        }
         logger.info(`Message sent for PSID: ${contact.sourceId}`)
       }
     } catch (error) {
@@ -71,8 +75,11 @@ export const sendMessage: MessageHandlers<MessengerAuthValue>["sendMessage"] =
       throw mapToChannelError(error)
     }
 
+    // Return the Send API message id(s). The worker persists messageIds[0] as
+    // the Message row's sourceId; without it the channel's message_echo webhook
+    // (coexist) cannot dedup the echo against this row and inserts a duplicate.
     return {
-      messageIds: [],
+      messageIds,
     }
   }
 
@@ -82,6 +89,7 @@ export const sendFlowStep: MessageHandlers<MessengerAuthValue>["sendFlowStep"] =
       ctx,
       data: { contact, sendFrom, step },
     } = props
+    const messageIds: string[] = []
     try {
       // Messenger utility templates must be sent as a complete Send API request
       // using message.template (name/language/components) — they cannot go through
@@ -93,16 +101,18 @@ export const sendFlowStep: MessageHandlers<MessengerAuthValue>["sendFlowStep"] =
             SendMessengerTemplateMessageStepSchema
           >,
         )
-        await sendPageMessage(ctx.auth, payload)
+        const response = await sendPageMessage(ctx.auth, payload)
         logger.info(`Messenger template sent for PSID: ${contact.sourceId}`)
-        return { messageIds: [] }
+        return {
+          messageIds: response.message_id ? [response.message_id] : [],
+        }
       }
 
       const policy = resolveMessengerMessagingPolicy({ contact, sendFrom })
       for await (const facebookMessage of convertFlowStepToFacebookMessage(
         props,
       )) {
-        await sendPageMessage(
+        const response = await sendPageMessage(
           ctx.auth,
           buildMessagePayload({
             contact,
@@ -112,6 +122,9 @@ export const sendFlowStep: MessageHandlers<MessengerAuthValue>["sendFlowStep"] =
               .personaId,
           }),
         )
+        if (response.message_id) {
+          messageIds.push(response.message_id)
+        }
         logger.info(`Message sent for PSID: ${contact.sourceId}`)
       }
     } catch (error) {
@@ -119,8 +132,10 @@ export const sendFlowStep: MessageHandlers<MessengerAuthValue>["sendFlowStep"] =
       throw mapToChannelError(error)
     }
 
+    // Return the Send API message id(s) so the worker can persist messageIds[0]
+    // as the Message row's sourceId (coexist echo dedup — see sendMessage).
     return {
-      messageIds: [],
+      messageIds,
     }
   }
 
@@ -221,11 +236,11 @@ export function resolveMessengerMessagingPolicy(props: {
   }
   const elapsedMs = nowMs - lastIncomingMessageAt.getTime()
 
-  if (elapsedMs <= RESPONSE_WINDOW_MS) {
+  if (elapsedMs <= META_RESPONSE_WINDOW_MS) {
     return { messagingType: "RESPONSE" }
   }
 
-  if (elapsedMs <= HUMAN_AGENT_WINDOW_MS) {
+  if (elapsedMs <= META_HUMAN_AGENT_WINDOW_MS) {
     return { messagingType: "MESSAGE_TAG", tag: "HUMAN_AGENT" }
   }
 
@@ -234,17 +249,6 @@ export function resolveMessengerMessagingPolicy(props: {
     ChannelErrorCategory.PAYLOAD_INVALID,
     { code: "messenger_human_agent_window_expired" },
   )
-}
-
-function normalizeLastIncomingMessageAt(
-  value: Date | string | null | undefined,
-) {
-  if (!value) {
-    return null
-  }
-
-  const date = value instanceof Date ? value : new Date(value)
-  return Number.isNaN(date.getTime()) ? null : date
 }
 
 async function* convertFlowStepToFacebookMessage(
